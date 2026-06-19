@@ -1,0 +1,20 @@
+# build outputs
+build*/
+cmake-build-*/
+_skbuild/
+*.so
+*.dylib
+*.o
+dist/
+*.egg-info/
+# python
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+# misc
+.DS_Store
+agent.log
+bench/out/
+*.npy

@@ -1,0 +1,30 @@
+[build-system]
+requires = ["scikit-build-core>=0.10", "pybind11>=2.12"]
+build-backend = "scikit_build_core.build"
+
+[project]
+name = "tsq"
+version = "0.1.0"
+description = "Mini-DSL for time-series queries, JIT-compiled with LLVM ORC"
+requires-python = ">=3.11"
+dependencies = ["numpy>=1.26"]
+license = { text = "MIT" }
+
+[project.optional-dependencies]
+test = ["pytest>=8", "pandas>=2.1", "ruff>=0.5"]
+
+[tool.scikit-build]
+wheel.packages = ["python/tsq"]
+cmake.build-type = "Release"
+cmake.define = { TSQ_BUILD_TESTS = "OFF", TSQ_BUILD_BENCH = "OFF" }
+
+[tool.pytest.ini_options]
+testpaths = ["tests/python"]
+pythonpath = ["python"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP"]
