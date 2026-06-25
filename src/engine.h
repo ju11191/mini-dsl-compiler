@@ -6,6 +6,7 @@
 
 #include <map>
 #include <memory>
+#include <stdexcept>
 #include <string>
 #include <vector>
 
@@ -22,7 +23,9 @@ struct CompileStats {
 };
 
 struct CompileOptions {
-  int opt_level = 2; // 0 = no IR optimization passes, 2 = default -O2 pipeline
+  int opt_level = 2;                 // 0 = no IR optimization passes, 2 = default -O2 pipeline
+  bool keep_ir = true;               // keep IR text (before/after optimization) for inspection
+  bool window_direct_input = false;  // see CodegenOptions
 };
 
 // A table supplied by name: column name -> view.
@@ -38,6 +41,11 @@ class Executable {
 public:
   virtual ~Executable() = default;
   virtual Result run(const BoundInputs& in) = 0;
+  // Write into caller-provided output buffers (one per output column, capacity
+  // >= source rows); returns the number of rows written. JIT only.
+  virtual int64_t run_raw(const BoundInputs&, void* const*) {
+    throw std::runtime_error("run_raw is only supported by the JIT backend");
+  }
 };
 
 class CompiledQuery {
@@ -60,6 +68,7 @@ public:
                           bool validate = true) const;
 
   Result run(const BoundInputs& in) { return exec_->run(in); }
+  int64_t run_raw(const BoundInputs& in, void* const* outputs) { return exec_->run_raw(in, outputs); }
   Result run(const NamedTables& tables, const std::vector<std::string>& symbols, bool validate = true) {
     return run(bind_inputs(tables, symbols, validate));
   }
