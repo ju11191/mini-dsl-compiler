@@ -6,6 +6,7 @@
 #include <llvm/Support/raw_ostream.h>
 
 #include <limits>
+#include <map>
 
 namespace tsq {
 
@@ -268,12 +269,211 @@ private:
     cur = std::move(next);
   }
 
-  void emit_window(const BStage&, std::vector<Slot>&) {
-    throw std::runtime_error("JIT: window not implemented yet");
+  BasicBlock* block(const char* name) { return BasicBlock::Create(C_, name, F_); }
+  Value* gep_load(llvm::Type* ty, Value* base, Value* idx, const char* name = "") {
+    return B_.CreateLoad(ty, B_.CreateInBoundsGEP(ty, base, idx), name);
+  }
+  void gep_store(Value* v, Value* base, Value* idx) {
+    B_.CreateStore(v, B_.CreateInBoundsGEP(v->getType(), base, idx));
   }
 
-  void emit_asof(const BStage&, std::vector<Slot>&) {
-    throw std::runtime_error("JIT: asof_join not implemented yet");
+  // Trailing time window (ts - dur, ts], updated incrementally per row that
+  // reaches this stage. Mirrors Interp::window operation-for-operation so FP
+  // results are bit-identical.
+  void emit_window(const BStage& st, std::vector<Slot>& cur) {
+    // Materialize every current-row value we need before emitting inner loops
+    // (lazy loads must be emitted in a block that dominates later uses).
+    Value* t = get(cur[st.ts_col]);
+    std::map<int, Value*> xval;  // agg input column -> current value
+    std::map<int, Value*> xhist; // agg input column -> history buffer
+    for (const auto& a : st.aggs)
+      if (a.col >= 0 && !xval.count(a.col)) xval[a.col] = get(cur[a.col]);
+
+    AllocaInst* kA = alloca_init(i64_, B_.getInt64(0), "win.k");
+    AllocaInst* startA = alloca_init(i64_, B_.getInt64(0), "win.start");
+    Value* hts = add_scratch({8, ScratchSpec::Len::SourceRows, false, 0}, "win.hist.ts");
+    for (const auto& [c, _] : xval)
+      xhist[c] = add_scratch({8, ScratchSpec::Len::SourceRows, false, 0}, "win.hist." + cur_name(st, c));
+
+    Value* k = B_.CreateLoad(i64_, kA, "k");
+    gep_store(t, hts, k);
+    for (const auto& [c, v] : xval) gep_store(v, xhist[c], k);
+    Value* lo = intrinsic(Intrinsic::ssub_sat, i64_, {t, B_.getInt64(uint64_t(st.dur_ns))});
+
+    // Per-aggregate state.
+    size_t na = st.aggs.size();
+    std::vector<AllocaInst*> sumA(na, nullptr), headA(na, nullptr), tailA(na, nullptr);
+    std::vector<Value*> dq(na, nullptr);
+    for (size_t a = 0; a < na; ++a) {
+      const BAgg& g = st.aggs[a];
+      llvm::Type* ty = value_ty(g.in_type);
+      if (g.fn == AggFn::Sum || g.fn == AggFn::Mean)
+        sumA[a] = alloca_init(ty, Constant::getNullValue(ty), "win.sum");
+      if (g.fn == AggFn::Min || g.fn == AggFn::Max) {
+        headA[a] = alloca_init(i64_, B_.getInt64(0), "win.dq.head");
+        tailA[a] = alloca_init(i64_, B_.getInt64(0), "win.dq.tail");
+        dq[a] = add_scratch({8, ScratchSpec::Len::SourceRows, false, 0}, "win.dq");
+      }
+    }
+
+    // 1. Evict rows with ts <= lo.
+    BasicBlock* ev_cond = block("win.evict.cond");
+    BasicBlock* ev_body = block("win.evict.body");
+    BasicBlock* ev_done = block("win.evict.done");
+    B_.CreateBr(ev_cond);
+    B_.SetInsertPoint(ev_cond);
+    Value* s = B_.CreateLoad(i64_, startA, "start");
+    Value* ts_s = gep_load(i64_, hts, s, "ts.old");
+    B_.CreateCondBr(B_.CreateICmpSLE(ts_s, lo), ev_body, ev_done);
+    B_.SetInsertPoint(ev_body);
+    for (size_t a = 0; a < na; ++a) {
+      if (!sumA[a]) continue;
+      const BAgg& g = st.aggs[a];
+      llvm::Type* ty = value_ty(g.in_type);
+      Value* x_old = gep_load(ty, xhist[g.col], s, "x.old");
+      Value* sum = B_.CreateLoad(ty, sumA[a]);
+      B_.CreateStore(g.in_type == Type::F64 ? B_.CreateFSub(sum, x_old) : B_.CreateSub(sum, x_old), sumA[a]);
+    }
+    B_.CreateStore(B_.CreateAdd(s, B_.getInt64(1)), startA);
+    B_.CreateBr(ev_cond);
+
+    // 2. Add row k, produce outputs.
+    B_.SetInsertPoint(ev_done);
+    s = B_.CreateLoad(i64_, startA, "start");
+    Value* empty = B_.CreateICmpEQ(s, k, "win.empty");
+    Value* count = B_.CreateAdd(B_.CreateSub(k, s), B_.getInt64(1), "count");
+    std::vector<Slot> outs;
+    for (size_t a = 0; a < na; ++a) {
+      const BAgg& g = st.aggs[a];
+      llvm::Type* ty = value_ty(g.in_type);
+      bool fp = g.in_type == Type::F64;
+      Value* result = nullptr;
+      switch (g.fn) {
+      case AggFn::Count: result = count; break;
+      case AggFn::Sum:
+      case AggFn::Mean: {
+        Value* sum = B_.CreateLoad(ty, sumA[a]);
+        sum = B_.CreateSelect(empty, Constant::getNullValue(ty), sum); // reset FP drift
+        Value* x = xval[g.col];
+        sum = fp ? B_.CreateFAdd(sum, x) : B_.CreateAdd(sum, x);
+        B_.CreateStore(sum, sumA[a]);
+        if (g.fn == AggFn::Sum) result = sum;
+        else result = B_.CreateFDiv(fp ? sum : B_.CreateSIToFP(sum, f64_), B_.CreateSIToFP(count, f64_), "mean");
+        break;
+      }
+      case AggFn::Min:
+      case AggFn::Max: {
+        bool is_min = g.fn == AggFn::Min;
+        Value* x = xval[g.col];
+        Value* hist = xhist[g.col];
+        // Pop from the back while the back is no better than x.
+        BasicBlock* pb_cond = block("win.dq.back.cond");
+        BasicBlock* pb_check = block("win.dq.back.check");
+        BasicBlock* pb_pop = block("win.dq.back.pop");
+        BasicBlock* pb_done = block("win.dq.back.done");
+        B_.CreateBr(pb_cond);
+        B_.SetInsertPoint(pb_cond);
+        Value* tl = B_.CreateLoad(i64_, tailA[a], "tail");
+        Value* hd = B_.CreateLoad(i64_, headA[a], "head");
+        B_.CreateCondBr(B_.CreateICmpSGT(tl, hd), pb_check, pb_done);
+        B_.SetInsertPoint(pb_check);
+        Value* tm1 = B_.CreateSub(tl, B_.getInt64(1));
+        Value* xb = gep_load(ty, hist, gep_load(i64_, dq[a], tm1), "x.back");
+        Value* pop = fp ? (is_min ? B_.CreateFCmpOGE(xb, x) : B_.CreateFCmpOLE(xb, x))
+                        : (is_min ? B_.CreateICmpSGE(xb, x) : B_.CreateICmpSLE(xb, x));
+        B_.CreateCondBr(pop, pb_pop, pb_done);
+        B_.SetInsertPoint(pb_pop);
+        B_.CreateStore(tm1, tailA[a]);
+        B_.CreateBr(pb_cond);
+        B_.SetInsertPoint(pb_done);
+        tl = B_.CreateLoad(i64_, tailA[a], "tail");
+        gep_store(k, dq[a], tl);
+        B_.CreateStore(B_.CreateAdd(tl, B_.getInt64(1)), tailA[a]);
+        // Pop stale indices from the front.
+        BasicBlock* fr_cond = block("win.dq.front.cond");
+        BasicBlock* fr_pop = block("win.dq.front.pop");
+        BasicBlock* fr_done = block("win.dq.front.done");
+        B_.CreateBr(fr_cond);
+        B_.SetInsertPoint(fr_cond);
+        hd = B_.CreateLoad(i64_, headA[a], "head");
+        Value* front = gep_load(i64_, dq[a], hd, "front");
+        B_.CreateCondBr(B_.CreateICmpSLT(front, s), fr_pop, fr_done);
+        B_.SetInsertPoint(fr_pop);
+        B_.CreateStore(B_.CreateAdd(hd, B_.getInt64(1)), headA[a]);
+        B_.CreateBr(fr_cond);
+        B_.SetInsertPoint(fr_done);
+        result = gep_load(ty, hist, front, is_min ? "min" : "max");
+        break;
+      }
+      }
+      outs.push_back(Slot{g.out_type, result, -1});
+    }
+    B_.CreateStore(B_.CreateAdd(k, B_.getInt64(1)), kA);
+    for (auto& o : outs) cur.push_back(o);
+  }
+
+  std::string cur_name(const BStage& st, int c) {
+    // Name of column c of this stage's input == the window's output schema prefix.
+    return st.out[c].name;
+  }
+
+  // Backward as-of join: merge with a forward-only cursor into the right
+  // table; last[code] remembers the latest right row per symbol.
+  void emit_asof(const BStage& st, std::vector<Slot>& cur) {
+    Value* t = get(cur[st.ts_col]);
+    Value* lk = get(cur[st.left_key]);
+    const auto& rp = in_ptrs_[st.right_table];
+    Value* nr = in_lens_[st.right_table];
+    AllocaInst* rpA = alloca_init(i64_, B_.getInt64(0), "asof.rp");
+    Value* last = add_scratch({8, ScratchSpec::Len::NSym, true, -1}, "asof.last");
+
+    BasicBlock* adv_cond = block("asof.adv.cond");
+    BasicBlock* adv_check = block("asof.adv.check");
+    BasicBlock* adv_body = block("asof.adv.body");
+    BasicBlock* adv_upd = block("asof.adv.update");
+    BasicBlock* adv_next = block("asof.adv.next");
+    BasicBlock* adv_done = block("asof.adv.done");
+    B_.CreateBr(adv_cond);
+    B_.SetInsertPoint(adv_cond);
+    Value* r = B_.CreateLoad(i64_, rpA, "rp");
+    B_.CreateCondBr(B_.CreateICmpSLT(r, nr), adv_check, adv_done);
+    B_.SetInsertPoint(adv_check);
+    Value* rts = gep_load(i64_, rp[st.right_ts], r, "rts");
+    B_.CreateCondBr(B_.CreateICmpSLE(rts, t), adv_body, adv_done);
+    B_.SetInsertPoint(adv_body);
+    Value* rk = B_.CreateSExt(gep_load(i32_, rp[st.right_key], r, "rkey"), i64_);
+    B_.CreateCondBr(B_.CreateICmpULT(rk, nsym_), adv_upd, adv_next);
+    B_.SetInsertPoint(adv_upd);
+    gep_store(r, last, rk);
+    B_.CreateBr(adv_next);
+    B_.SetInsertPoint(adv_next);
+    B_.CreateStore(B_.CreateAdd(r, B_.getInt64(1)), rpA);
+    B_.CreateBr(adv_cond);
+
+    B_.SetInsertPoint(adv_done);
+    Value* lkz = B_.CreateSExt(lk, i64_);
+    Value* ok = B_.CreateICmpULT(lkz, nsym_);
+    Value* j0 = gep_load(i64_, last, B_.CreateSelect(ok, lkz, B_.getInt64(0)));
+    Value* j = B_.CreateSelect(ok, j0, B_.getInt64(uint64_t(-1)), "j");
+    BasicBlock* gather = block("asof.gather");
+    BasicBlock* merge = block("asof.merge");
+    BasicBlock* from = B_.GetInsertBlock();
+    B_.CreateCondBr(B_.CreateICmpSGE(j, B_.getInt64(0)), gather, merge);
+    B_.SetInsertPoint(gather);
+    std::vector<Value*> vals;
+    for (const auto& p : st.payload) {
+      Value* v = gep_load(storage_ty(p.in_type), rp[p.right_col], j);
+      vals.push_back(p.in_type == Type::F64 ? v : B_.CreateSIToFP(v, f64_));
+    }
+    B_.CreateBr(merge);
+    B_.SetInsertPoint(merge);
+    Value* nan = ConstantFP::getQNaN(f64_);
+    for (size_t p = 0; p < st.payload.size(); ++p) {
+      PHINode* phi = B_.CreatePHI(f64_, 2, st.payload[p].name);
+      phi->addIncoming(nan, from);
+      phi->addIncoming(vals[p], gather);
+      cur.push_back(Slot{Type::F64, phi, -1});
+    }
   }
 };
 
