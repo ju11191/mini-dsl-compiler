@@ -12,7 +12,7 @@ namespace tsq {
 
 std::vector<std::string> default_symbols(); // AAPL, MSFT, ... (8 tickers)
 
-// trades: ts:i64 (ns, ascending), sym:sym, price:f64 (per-symbol random walk), size:i64 (1..1000)
+// trades: ts:i64 (ns, ascending), sym:sym, price:f64 (mean-reverting per symbol), size:i64 (1..1000)
 OwnedTable gen_trades(int64_t n, uint64_t seed, int nsym = 8);
 // quotes: ts:i64 (ns, ascending), sym:sym, bid:f64, ask:f64
 OwnedTable gen_quotes(int64_t n, uint64_t seed, int nsym = 8);

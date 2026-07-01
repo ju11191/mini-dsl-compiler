@@ -15,6 +15,17 @@ uint64_t rotl(uint64_t x, int k) { return (x << k) | (x >> (64 - k)); }
 
 // 2024-01-02 14:30:00 UTC (09:30 New York) in ns since the epoch.
 constexpr int64_t kStartNs = 1704205800LL * 1000000000LL;
+
+// Long-run mean price per symbol; AAPL hovers around 100 so `price > 100` is selective.
+double base_price(int s) {
+  static const double kBase[] = {100, 400, 140, 180, 500, 120, 250, 95};
+  return s < 8 ? kBase[s] : 50.0 + 25.0 * s;
+}
+
+// Mean-reverting (Ornstein-Uhlenbeck style) step: stays within a few % of base.
+double step(double px, double base, Rng& rng) {
+  return px + 0.001 * (base - px) + base * 0.002 * (rng.uniform() - 0.5);
+}
 } // namespace
 
 Rng::Rng(uint64_t seed) {
@@ -49,12 +60,12 @@ OwnedTable gen_trades(int64_t n, uint64_t seed, int nsym) {
   auto* size = t.col<int64_t>("size");
   Rng rng(seed);
   std::vector<double> px(nsym);
-  for (int s = 0; s < nsym; ++s) px[s] = 50.0 + 25.0 * s; // 50, 75, ..., spans the 100 threshold
+  for (int s = 0; s < nsym; ++s) px[s] = base_price(s);
   int64_t now = kStartNs;
   for (int64_t i = 0; i < n; ++i) {
     now += rng.range(0, 2000) * 1000; // 0..2ms gaps (duplicates possible), mean 1ms
     int s = int(rng.next() % uint64_t(nsym));
-    px[s] *= 1.0 + (rng.uniform() - 0.5) * 0.002;
+    px[s] = step(px[s], base_price(s), rng);
     ts[i] = now;
     sym[i] = s;
     price[i] = std::round(px[s] * 100.0) / 100.0;
@@ -71,13 +82,13 @@ OwnedTable gen_quotes(int64_t n, uint64_t seed, int nsym) {
   auto* ask = t.col<double>("ask");
   Rng rng(seed ^ 0x51ab1e5ULL);
   std::vector<double> mid(nsym);
-  for (int s = 0; s < nsym; ++s) mid[s] = 50.0 + 25.0 * s;
+  for (int s = 0; s < nsym; ++s) mid[s] = base_price(s);
   // Quotes start slightly before trades so most trades find a quote.
   int64_t now = kStartNs - 5'000'000;
   for (int64_t i = 0; i < n; ++i) {
     now += rng.range(0, 2000) * 1000;
     int s = int(rng.next() % uint64_t(nsym));
-    mid[s] *= 1.0 + (rng.uniform() - 0.5) * 0.002;
+    mid[s] = step(mid[s], base_price(s), rng);
     double half = 0.01 * double(rng.range(1, 5));
     ts[i] = now;
     sym[i] = s;
