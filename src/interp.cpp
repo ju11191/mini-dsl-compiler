@@ -51,12 +51,19 @@ public:
       case BStage::Kind::Asof: r = asof(st, r); break;
       }
     }
-    // Copy into owned result columns.
+    // Hand over buffers the interpreter owns exclusively; copy the rest
+    // (views of input columns, or buffers shared by two output columns).
     Result res;
     res.rows = r.rows;
     for (size_t c = 0; c < r.cols.size(); ++c) {
-      Column col{q_.output[c].name, q_.output[c].type, Buffer(size_t(std::max<int64_t>(r.rows, 1)) * type_size(r.cols[c].type))};
-      if (r.rows) std::memcpy(col.data.data(), r.cols[c].data, size_t(r.rows) * type_size(r.cols[c].type));
+      RCol& rc = r.cols[c];
+      Column col{q_.output[c].name, q_.output[c].type, Buffer()};
+      if (rc.owner && rc.owner.use_count() == 1) {
+        col.data = std::move(*rc.owner);
+      } else {
+        col.data = Buffer(size_t(std::max<int64_t>(r.rows, 1)) * type_size(rc.type));
+        if (r.rows) std::memcpy(col.data.data(), rc.data, size_t(r.rows) * type_size(rc.type));
+      }
       res.cols.push_back(std::move(col));
     }
     return res;
