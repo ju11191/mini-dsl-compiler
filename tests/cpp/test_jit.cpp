@@ -41,6 +41,11 @@ TEST_P(JitVsInterp, Identical) {
   CompileOptions o0;
   o0.opt_level = 0;
   expect_same(GetParam(), o0);
+  CompileOptions copy;
+  copy.window_direct_input = false;
+  expect_same(GetParam(), copy);
+  copy.opt_level = 0;
+  expect_same(GetParam(), copy);
 }
 
 INSTANTIATE_TEST_SUITE_P(
@@ -94,6 +99,21 @@ TEST(Jit, IrIsOneFusedLoop) {
   EXPECT_EQ(ir.find("call "), std::string::npos) << "fused loop should not call anything:\n" << ir;
   EXPECT_FALSE(q->ir_unoptimized().empty());
   EXPECT_GT(q->stats().codegen_ms, 0.0);
+}
+
+TEST(Jit, WindowDirectInputSkipsHistoryCopy) {
+  auto cat = trades_quotes_catalog();
+  CompileOptions copy, direct;
+  copy.window_direct_input = false;
+  direct.window_direct_input = true;
+  const char* text = "trades | window 5m sum(size), max(price)";
+  auto a = CompiledQuery::compile(text, cat, Backend::Jit, copy);
+  auto b = CompiledQuery::compile(text, cat, Backend::Jit, direct);
+  EXPECT_NE(a->ir_unoptimized().find("win.hist.ts"), std::string::npos);
+  EXPECT_EQ(b->ir_unoptimized().find("win.hist."), std::string::npos) << b->ir_unoptimized();
+  // After a filter the window input is no longer the source rows: history is copied.
+  auto c = CompiledQuery::compile("trades | filter size > 5 | window 5m max(price)", cat, Backend::Jit, direct);
+  EXPECT_NE(c->ir_unoptimized().find("win.hist.ts"), std::string::npos);
 }
 
 TEST(Jit, RunRawIntoCallerBuffers) {

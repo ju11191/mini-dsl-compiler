@@ -128,7 +128,7 @@ public:
 
 private:
   const BoundQuery& q_;
-  [[maybe_unused]] const CodegenOptions& opts_;
+  const CodegenOptions& opts_;
   LLVMContext& C_;
   Module& M_;
   IRBuilder<> B_;
@@ -289,15 +289,28 @@ private:
     for (const auto& a : st.aggs)
       if (a.col >= 0 && !xval.count(a.col)) xval[a.col] = get(cur[a.col]);
 
+    // History buffers. If no filter ran before this stage, row k of the
+    // window's input is source row k, so a column passed straight through from
+    // the source can be read from the input array instead of being copied.
+    auto direct = [&](int c) -> Value* {
+      if (!opts_.window_direct_input || rows_dropped_ || cur[c].src_col < 0) return nullptr;
+      return in_ptrs_[0][cur[c].src_col];
+    };
     AllocaInst* kA = alloca_init(i64_, B_.getInt64(0), "win.k");
     AllocaInst* startA = alloca_init(i64_, B_.getInt64(0), "win.start");
-    Value* hts = add_scratch({8, ScratchSpec::Len::SourceRows, false, 0}, "win.hist.ts");
-    for (const auto& [c, _] : xval)
-      xhist[c] = add_scratch({8, ScratchSpec::Len::SourceRows, false, 0}, "win.hist." + cur_name(st, c));
-
     Value* k = B_.CreateLoad(i64_, kA, "k");
-    gep_store(t, hts, k);
-    for (const auto& [c, v] : xval) gep_store(v, xhist[c], k);
+    Value* hts = direct(st.ts_col);
+    if (!hts) {
+      hts = add_scratch({8, ScratchSpec::Len::SourceRows, false, 0}, "win.hist.ts");
+      gep_store(t, hts, k);
+    }
+    for (const auto& [c, v] : xval) {
+      xhist[c] = direct(c);
+      if (!xhist[c]) {
+        xhist[c] = add_scratch({8, ScratchSpec::Len::SourceRows, false, 0}, "win.hist." + cur_name(st, c));
+        gep_store(v, xhist[c], k);
+      }
+    }
     Value* lo = intrinsic(Intrinsic::ssub_sat, i64_, {t, B_.getInt64(uint64_t(st.dur_ns))});
 
     // Per-aggregate state.

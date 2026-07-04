@@ -1,0 +1,18 @@
+# Optimization 1: window reads history from input arrays (window_direct_input)
+# host: Apple M3, 8 cpus (4P+4E), 16 GB; macOS 15.7 (Darwin 24.6.0); LLVM 23.1.2
+# NOTE: machine was shared with other heavy processes (load average 8-17 during the run).
+# command (alternating 3x): build/bench_queries --rows 10000000 --reps 7 --only window --no-interp --window-direct {0,1}
+# load averages: 8.61 15.72 11.21 (before)  7.94 14.99 11.07 (after)
+query             out_rows     interp   jit_med   jit_min  hand_med  hand_min  jit_cold  int/jit jit/hand    (min)  c_parse  c_irgen    c_opt     c_mc  c_total  match
+# window_direct_input=0
+window            10000000        0.0     249.9     248.0     213.2     210.4     304.3     0.00    1.172    1.178    0.006    0.055     2.54     4.10     6.78    yes
+# window_direct_input=1
+window            10000000        0.0     209.4     204.1     219.7     210.6     242.5     0.00    0.953    0.969    0.006    0.056     2.60     4.06     6.87    yes
+# window_direct_input=0
+window            10000000        0.0     285.2     284.1     223.3     220.7     335.7     0.00    1.277    1.287    0.007    0.056     2.66     4.47     7.36    yes
+# window_direct_input=1
+window            10000000        0.0     221.7     221.2     230.4     228.8     257.8     0.00    0.962    0.967    0.005    0.059     2.61     4.19     7.02    yes
+# window_direct_input=0
+window            10000000        0.0     330.2     298.7     236.4     234.8     353.2     0.00    1.397    1.272    0.006    0.055     2.59     4.33     7.05    yes
+# window_direct_input=1
+window            10000000        0.0     231.2     218.6     242.2     228.6     257.7     0.00    0.954    0.956    0.007    0.054     2.43     4.08     6.70    yes

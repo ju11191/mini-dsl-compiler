@@ -18,7 +18,7 @@ namespace tsq {
 struct CodegenOptions {
   // Read window history straight from the input arrays when no filter precedes
   // the window. Off = always copy into scratch history.
-  bool window_direct_input = false;
+  bool window_direct_input = true;
 };
 
 struct GeneratedModule {
