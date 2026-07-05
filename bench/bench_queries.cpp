@@ -118,16 +118,23 @@ int main(int argc, char** argv) {
 
   std::printf("# tsq benchmark: rows=%lld reps=%d window_direct_input=%d\n", (long long)rows, reps,
               int(copts.window_direct_input));
+  auto selected = [&](const std::string& name) {
+    return only.empty() || ("," + only + ",").find("," + name + ",") != std::string::npos;
+  };
+  // quotes are only generated when a selected query joins them (saves 1.4 GB at 50M rows).
+  bool need_quotes = false;
+  for (const auto& bq : queries)
+    if (selected(bq.name) && bq.text.find("quotes") != std::string::npos) need_quotes = true;
   auto t0 = Clock::now();
   auto symbols = default_symbols();
   OwnedTable trades = gen_trades(rows, 1);
-  OwnedTable quotes = gen_quotes(rows, 2);
+  OwnedTable quotes = gen_quotes(need_quotes ? rows : 0, 2);
   std::printf("# generated trades+quotes in %.0f ms\n", ms(t0, Clock::now()));
   NamedTables tables{{"trades", named(trades)}, {"quotes", named(quotes)}};
 
   hw::In hin{trades.col<int64_t>("ts"), trades.col<int32_t>("sym"), trades.col<double>("price"),
              trades.col<int64_t>("size"), rows, quotes.col<int64_t>("ts"), quotes.col<int32_t>("sym"),
-             quotes.col<double>("bid"), quotes.col<double>("ask"), rows, 0, int64_t(symbols.size())};
+             quotes.col<double>("bid"), quotes.col<double>("ask"), quotes.rows, 0, int64_t(symbols.size())};
   hw::Scratch hscratch;
 
   Catalog cat;
@@ -140,7 +147,7 @@ int main(int argc, char** argv) {
               "c_parse", "c_irgen", "c_opt", "c_mc", "c_total", "match");
   bool all_match = true;
   for (const auto& bq : queries) {
-    if (!only.empty() && ("," + only + ",").find("," + bq.name + ",") == std::string::npos) continue;
+    if (!selected(bq.name)) continue;
 
     // Compile time: median of 5 fresh compiles (each creates its own LLJIT).
     std::vector<double> cp, ci, co, cm, ct;
