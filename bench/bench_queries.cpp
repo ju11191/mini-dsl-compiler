@@ -2,6 +2,9 @@
 //
 //   bench_queries [--rows N] [--reps R] [--only name,name] [--no-interp] [--window-direct 0|1]
 //
+// Rows named "<query>/&" rerun <query> with a hand-written variant that uses a
+// non-short-circuit `&` in the predicate (one branch per row, like the JIT).
+//
 // All three produce the same output columns; each run's output is hashed and
 // the hashes must match across the three implementations.
 #include "datagen.h"
@@ -97,8 +100,9 @@ int main(int argc, char** argv) {
     else if (a == "--no-interp") run_interp = false;
     else if (a == "--interp-only") interp_only = true;
     else if (a == "--window-direct" && i + 1 < argc) copts.window_direct_input = std::stoi(argv[++i]) != 0;
+    else if (a == "--window-outhist" && i + 1 < argc) copts.window_output_history = std::stoi(argv[++i]) != 0;
     else {
-      std::fprintf(stderr, "usage: bench_queries [--rows N] [--reps R] [--only a,b] [--no-interp | --interp-only] [--window-direct 0|1]\n");
+      std::fprintf(stderr, "usage: bench_queries [--rows N] [--reps R] [--only a,b] [--no-interp | --interp-only] [--window-direct 0|1] [--window-outhist 0|1]\n");
       return 2;
     }
   }
@@ -106,6 +110,8 @@ int main(int argc, char** argv) {
   std::vector<BenchQuery> queries = {
       {"filter", R"(trades | filter price > 100 and sym == "AAPL")",
        [](const hw::In& in, void* const* o, hw::Scratch&) { return hw::filter(in, o); }},
+      {"filter/&", R"(trades | filter price > 100 and sym == "AAPL")",
+       [](const hw::In& in, void* const* o, hw::Scratch&) { return hw::filter_bitand(in, o); }},
       {"filter_wide", R"(trades | filter price > 100 | select ts, sym, price)",
        [](const hw::In& in, void* const* o, hw::Scratch&) { return hw::filter_wide(in, o); }},
       {"filter_project", R"(trades | filter price > 100 and size < 500 | select ts, notional = price * size)",
@@ -116,10 +122,13 @@ int main(int argc, char** argv) {
        [](const hw::In& in, void* const* o, hw::Scratch& s) { return hw::asof(in, o, s); }},
       {"combined", R"(trades | filter price > 100 and sym == "AAPL" | window 5m mean(price) | asof_join quotes on sym)",
        [](const hw::In& in, void* const* o, hw::Scratch& s) { return hw::combined(in, o, s); }},
+      {"combined/&", R"(trades | filter price > 100 and sym == "AAPL" | window 5m mean(price) | asof_join quotes on sym)",
+       [](const hw::In& in, void* const* o, hw::Scratch& s) { return hw::combined_bitand(in, o, s); }},
   };
 
-  std::printf("# tsq benchmark: rows=%lld reps=%d window_direct_input=%d mode=%s\n", (long long)rows, reps,
-              int(copts.window_direct_input), interp_only ? "interp-only" : run_interp ? "all" : "native-only");
+  std::printf("# tsq benchmark: rows=%lld reps=%d window_direct_input=%d window_output_history=%d mode=%s\n",
+              (long long)rows, reps, int(copts.window_direct_input), int(copts.window_output_history),
+              interp_only ? "interp-only" : run_interp ? "all" : "native-only");
   auto selected = [&](const std::string& name) {
     return only.empty() || ("," + only + ",").find("," + name + ",") != std::string::npos;
   };

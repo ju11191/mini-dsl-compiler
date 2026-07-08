@@ -33,6 +33,24 @@ int64_t filter(const In& in, void* const* out) {
   return o;
 }
 
+int64_t filter_bitand(const In& in, void* const* out) {
+  auto* ots = static_cast<int64_t*>(out[0]);
+  auto* osym = static_cast<int32_t*>(out[1]);
+  auto* opx = static_cast<double*>(out[2]);
+  auto* osz = static_cast<int64_t*>(out[3]);
+  int64_t o = 0;
+  for (int64_t i = 0; i < in.n; ++i) {
+    if ((in.price[i] > 100.0) & (in.sym[i] == in.aapl)) {
+      ots[o] = in.ts[i];
+      osym[o] = in.sym[i];
+      opx[o] = in.price[i];
+      osz[o] = in.size[i];
+      ++o;
+    }
+  }
+  return o;
+}
+
 int64_t filter_wide(const In& in, void* const* out) {
   auto* ots = static_cast<int64_t*>(out[0]);
   auto* osym = static_cast<int32_t*>(out[1]);
@@ -143,7 +161,8 @@ int64_t asof(const In& in, void* const* out, Scratch& s) {
   return in.n;
 }
 
-int64_t combined(const In& in, void* const* out, Scratch& s) {
+namespace {
+template <bool BitAnd> int64_t combined_impl(const In& in, void* const* out, Scratch& s) {
   auto* ots = static_cast<int64_t*>(out[0]);
   auto* osym = static_cast<int32_t*>(out[1]);
   auto* opx = static_cast<double*>(out[2]);
@@ -156,7 +175,8 @@ int64_t combined(const In& in, void* const* out, Scratch& s) {
   int64_t rp = 0, o = 0, start = 0;
   double fsum = 0.0;
   for (int64_t i = 0; i < in.n; ++i) {
-    if (!(in.price[i] > 100.0 && in.sym[i] == in.aapl)) continue;
+    bool pass = BitAnd ? ((in.price[i] > 100.0) & (in.sym[i] == in.aapl)) : (in.price[i] > 100.0 && in.sym[i] == in.aapl);
+    if (!pass) continue;
     const int64_t t = in.ts[i];
     const double x = in.price[i];
     // The output columns double as the window's history (they hold exactly
@@ -184,5 +204,9 @@ int64_t combined(const In& in, void* const* out, Scratch& s) {
   }
   return o;
 }
+} // namespace
+
+int64_t combined(const In& in, void* const* out, Scratch& s) { return combined_impl<false>(in, out, s); }
+int64_t combined_bitand(const In& in, void* const* out, Scratch& s) { return combined_impl<true>(in, out, s); }
 
 } // namespace hw

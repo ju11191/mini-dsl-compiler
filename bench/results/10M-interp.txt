@@ -1,0 +1,23 @@
+# date: 2026-10-19T06:06:26Z
+# host: Apple M3, 8 cpus, 16 GB
+# os: Darwin 24.6.0; llvm: 23.1.2
+# load averages before run: 5.70 9.66 10.73
+# command: build/bench_queries --rows 10000000 --reps 5 --interp-only
+# tsq benchmark: rows=10000000 reps=5 window_direct_input=1 mode=interp-only
+# generated trades+quotes in 114 ms
+# times in ms; med = median, min = minimum over reps; ratios use medians (and mins)
+query             out_rows     interp   jit_med   jit_min  hand_med  hand_min  jit_cold  int/jit jit/hand    (min)  c_parse  c_irgen    c_opt     c_mc  c_total  match
+filter              639232      172.2       0.0       0.0       0.0       0.0       0.0      inf      nan      nan    0.005    0.025     0.79     2.34     3.28    yes
+#raw filter jit_ms=0, hand_ms=0, jit_cold_ms=0 interp_ms=172.199,179.687,169.652, compile_total_ms=5.16525,3.46129,3.27746,3.146,3.16375,
+filter_wide        8140733      168.9       0.0       0.0       0.0       0.0       0.0      inf      nan      nan    0.004    0.019     0.64     1.27     2.02    yes
+#raw filter_wide jit_ms=0, hand_ms=0, jit_cold_ms=0 interp_ms=164.094,168.917,171.071, compile_total_ms=2.81817,2.18896,2.01229,2.01917,2.01238,
+filter_project     4062453      281.8       0.0       0.0       0.0       0.0       0.0      inf      nan      nan    0.006    0.021     0.70     1.32     2.11    yes
+#raw filter_project jit_ms=0, hand_ms=0, jit_cold_ms=0 interp_ms=281.752,273.939,296.597, compile_total_ms=3.31508,2.40129,2.10629,2.08108,2.08363,
+window            10000000      319.9       0.0       0.0       0.0       0.0       0.0      inf      nan      nan    0.005    0.050     2.33     3.90     6.44    yes
+#raw window jit_ms=0, hand_ms=0, jit_cold_ms=0 interp_ms=328.619,316.594,319.91, compile_total_ms=7.45808,6.44238,6.44925,6.36929,6.30625,
+asof              10000000       86.0       0.0       0.0       0.0       0.0       0.0      inf      nan      nan    0.003    0.032     1.22     2.94     4.30    yes
+#raw asof jit_ms=0, hand_ms=0, jit_cold_ms=0 interp_ms=86.764,85.9919,85.4591, compile_total_ms=5.08983,4.38508,4.30133,4.22138,4.10021,
+combined            639232      182.0       0.0       0.0       0.0       0.0       0.0      inf      nan      nan    0.015    0.067     2.15     4.14     7.68    yes
+#raw combined jit_ms=0, hand_ms=0, jit_cold_ms=0 interp_ms=181.974,182.002,182.221, compile_total_ms=6.36996,8.69017,14.5527,7.68108,6.26983,
+# peak RSS 1616 MB; all outputs match: yes
+# load averages after run: 5.56 9.57 10.69

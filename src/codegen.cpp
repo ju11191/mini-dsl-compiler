@@ -88,8 +88,10 @@ public:
     src_cache_.assign(q_.input().size(), nullptr);
     rows_dropped_ = false;
 
+    prestored_.assign(q_.output.size(), false);
     for (size_t s = 0; s < q_.stages.size(); ++s) {
       const BStage& st = q_.stages[s];
+      stage_idx_ = s;
       switch (st.kind) {
       case BStage::Kind::Filter: emit_filter(st, cur); break;
       case BStage::Kind::Project: emit_project(st, cur); break;
@@ -101,6 +103,7 @@ public:
     // Store the surviving row.
     Value* o = B_.CreateLoad(i64_, o_, "o.cur");
     for (size_t c = 0; c < cur.size(); ++c) {
+      if (prestored_[c]) continue; // already written by a window stage
       Value* v = get(cur[c]);
       Value* p = B_.CreateInBoundsGEP(storage_ty(cur[c].type), out_ptrs_[c], o);
       B_.CreateStore(v, p);
@@ -149,6 +152,30 @@ private:
   std::vector<Value*> src_cache_;
   std::vector<ScratchSpec> scratch_;
   bool rows_dropped_ = false; // has a filter run before the current point?
+  size_t stage_idx_ = 0;
+  std::vector<bool> prestored_; // output columns already stored for this row
+
+  // Index in the final output of column `c` of stage `s`'s output, if it is
+  // passed through unchanged by every later stage; -1 otherwise.
+  int trace_to_output(size_t s, int c) const {
+    for (size_t t = s + 1; t < q_.stages.size() && c >= 0; ++t) {
+      const BStage& st = q_.stages[t];
+      if (st.kind != BStage::Kind::Project) continue; // filter/window/asof keep indices
+      int next = -1;
+      for (size_t j = 0; j < st.exprs.size(); ++j)
+        if (st.exprs[j]->kind == BExpr::Kind::Col && st.exprs[j]->col == c) {
+          next = int(j);
+          break;
+        }
+      c = next;
+    }
+    return c;
+  }
+  bool filter_after(size_t s) const {
+    for (size_t t = s + 1; t < q_.stages.size(); ++t)
+      if (q_.stages[t].kind == BStage::Kind::Filter) return true;
+    return false;
+  }
 
   // ---- helpers ----
   llvm::Type* storage_ty(Type t) {
@@ -299,13 +326,25 @@ private:
     AllocaInst* kA = alloca_init(i64_, B_.getInt64(0), "win.k");
     AllocaInst* startA = alloca_init(i64_, B_.getInt64(0), "win.start");
     Value* k = B_.CreateLoad(i64_, kA, "k");
+    // Otherwise, if no filter follows, row k of this stage is output row k:
+    // store the column to the output now and read history back from there.
+    const bool out_ok = opts_.window_output_history && !filter_after(stage_idx_);
+    auto out_hist = [&](int c, Value* v) -> Value* {
+      int oc = out_ok ? trace_to_output(stage_idx_, c) : -1;
+      if (oc < 0) return nullptr;
+      gep_store(v, out_ptrs_[oc], k);
+      prestored_[oc] = true;
+      return out_ptrs_[oc];
+    };
     Value* hts = direct(st.ts_col);
+    if (!hts) hts = out_hist(st.ts_col, t);
     if (!hts) {
       hts = add_scratch({8, ScratchSpec::Len::SourceRows, false, 0}, "win.hist.ts");
       gep_store(t, hts, k);
     }
     for (const auto& [c, v] : xval) {
       xhist[c] = direct(c);
+      if (!xhist[c]) xhist[c] = out_hist(c, v);
       if (!xhist[c]) {
         xhist[c] = add_scratch({8, ScratchSpec::Len::SourceRows, false, 0}, "win.hist." + cur_name(st, c));
         gep_store(v, xhist[c], k);

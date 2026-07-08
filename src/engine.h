@@ -26,6 +26,7 @@ struct CompileOptions {
   int opt_level = 2;                 // 0 = no IR optimization passes, 2 = default -O2 pipeline
   bool keep_ir = true;               // keep IR text (before/after optimization) for inspection
   bool window_direct_input = true;   // see CodegenOptions
+  bool window_output_history = true;  // see CodegenOptions
 };
 
 // A table supplied by name: column name -> view.

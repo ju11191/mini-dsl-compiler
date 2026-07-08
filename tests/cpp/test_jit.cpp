@@ -43,9 +43,16 @@ TEST_P(JitVsInterp, Identical) {
   expect_same(GetParam(), o0);
   CompileOptions copy;
   copy.window_direct_input = false;
+  copy.window_output_history = false;
   expect_same(GetParam(), copy);
   copy.opt_level = 0;
   expect_same(GetParam(), copy);
+  CompileOptions outhist;
+  outhist.window_direct_input = false; // force the output-history path wherever it applies
+  outhist.window_output_history = true;
+  expect_same(GetParam(), outhist);
+  outhist.window_direct_input = true;
+  expect_same(GetParam(), outhist);
 }
 
 INSTANTIATE_TEST_SUITE_P(
@@ -105,7 +112,9 @@ TEST(Jit, WindowDirectInputSkipsHistoryCopy) {
   auto cat = trades_quotes_catalog();
   CompileOptions copy, direct;
   copy.window_direct_input = false;
+  copy.window_output_history = false;
   direct.window_direct_input = true;
+  direct.window_output_history = false;
   const char* text = "trades | window 5m sum(size), max(price)";
   auto a = CompiledQuery::compile(text, cat, Backend::Jit, copy);
   auto b = CompiledQuery::compile(text, cat, Backend::Jit, direct);
@@ -114,6 +123,25 @@ TEST(Jit, WindowDirectInputSkipsHistoryCopy) {
   // After a filter the window input is no longer the source rows: history is copied.
   auto c = CompiledQuery::compile("trades | filter size > 5 | window 5m max(price)", cat, Backend::Jit, direct);
   EXPECT_NE(c->ir_unoptimized().find("win.hist.ts"), std::string::npos);
+}
+
+TEST(Jit, WindowOutputHistory) {
+  auto cat = trades_quotes_catalog();
+  CompileOptions o;
+  o.window_output_history = true;
+  // Filter before the window, none after: ts/price history lives in the outputs.
+  auto a = CompiledQuery::compile(R"(trades | filter sym == "AAPL" | window 5m mean(price) | asof_join quotes on sym)",
+                                  cat, Backend::Jit, o);
+  EXPECT_EQ(a->ir_unoptimized().find("win.hist."), std::string::npos) << a->ir_unoptimized();
+  // A filter after the window: rows may be dropped, so history needs scratch.
+  auto b = CompiledQuery::compile(R"(trades | filter sym == "AAPL" | window 5m mean(price) | filter size > 3)", cat,
+                                  Backend::Jit, o);
+  EXPECT_NE(b->ir_unoptimized().find("win.hist.ts"), std::string::npos);
+  // price is dropped by the select, so its history needs scratch; ts survives.
+  auto c = CompiledQuery::compile(R"(trades | filter sym == "AAPL" | window 5m mean(price) | select ts, mean_price)",
+                                  cat, Backend::Jit, o);
+  EXPECT_EQ(c->ir_unoptimized().find("win.hist.ts"), std::string::npos);
+  EXPECT_NE(c->ir_unoptimized().find("win.hist.price"), std::string::npos);
 }
 
 TEST(Jit, RunRawIntoCallerBuffers) {

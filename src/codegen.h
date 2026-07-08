@@ -19,6 +19,10 @@ struct CodegenOptions {
   // Read window history straight from the input arrays when no filter precedes
   // the window. Off = always copy into scratch history.
   bool window_direct_input = true;
+  // When no filter follows a window, every row reaching it is written to the
+  // output at the same index, so a column passed through to the output can be
+  // stored there early and used as the window's history (no scratch copy).
+  bool window_output_history = true;
 };
 
 struct GeneratedModule {

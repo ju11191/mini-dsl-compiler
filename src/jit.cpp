@@ -94,6 +94,7 @@ public:
     auto t0 = Clock::now();
     CodegenOptions cgo;
     cgo.window_direct_input = opts.window_direct_input;
+    cgo.window_output_history = opts.window_output_history;
     GeneratedModule gm = generate_ir(q, cgo, &dl, &tm->getTargetTriple());
     scratch_spec_ = gm.scratch;
     stats.irgen_ms = ms_since(t0);

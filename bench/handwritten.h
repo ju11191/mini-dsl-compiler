@@ -30,6 +30,8 @@ struct Scratch {
 
 // trades | filter price > 100 and sym == "AAPL"            -> ts, sym, price, size
 int64_t filter(const In& in, void* const* out);
+// Same query, written with a non-short-circuit `&` so there is one branch per row.
+int64_t filter_bitand(const In& in, void* const* out);
 // trades | filter price > 100 | select ts, sym, price        -> ts, sym, price
 int64_t filter_wide(const In& in, void* const* out);
 // trades | filter price > 100 and size < 500 | select ts, notional = price * size
@@ -40,5 +42,7 @@ int64_t window(const In& in, void* const* out, Scratch& s);
 int64_t asof(const In& in, void* const* out, Scratch& s);
 // trades | filter price > 100 and sym == "AAPL" | window 5m mean(price) | asof_join quotes on sym
 int64_t combined(const In& in, void* const* out, Scratch& s);
+// Same query with a non-short-circuit `&` in the predicate.
+int64_t combined_bitand(const In& in, void* const* out, Scratch& s);
 
 } // namespace hw
