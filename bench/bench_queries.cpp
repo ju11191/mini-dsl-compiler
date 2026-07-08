@@ -86,6 +86,7 @@ int main(int argc, char** argv) {
   int64_t rows = 50'000'000;
   int reps = 5;
   bool run_interp = true;
+  bool interp_only = false; // time only the interpreter (JIT/hand run once, for the output hash)
   std::string only;
   CompileOptions copts;
   for (int i = 1; i < argc; ++i) {
@@ -94,9 +95,10 @@ int main(int argc, char** argv) {
     else if (a == "--reps" && i + 1 < argc) reps = std::stoi(argv[++i]);
     else if (a == "--only" && i + 1 < argc) only = argv[++i];
     else if (a == "--no-interp") run_interp = false;
+    else if (a == "--interp-only") interp_only = true;
     else if (a == "--window-direct" && i + 1 < argc) copts.window_direct_input = std::stoi(argv[++i]) != 0;
     else {
-      std::fprintf(stderr, "usage: bench_queries [--rows N] [--reps R] [--only a,b] [--no-interp] [--window-direct 0|1]\n");
+      std::fprintf(stderr, "usage: bench_queries [--rows N] [--reps R] [--only a,b] [--no-interp | --interp-only] [--window-direct 0|1]\n");
       return 2;
     }
   }
@@ -116,8 +118,8 @@ int main(int argc, char** argv) {
        [](const hw::In& in, void* const* o, hw::Scratch& s) { return hw::combined(in, o, s); }},
   };
 
-  std::printf("# tsq benchmark: rows=%lld reps=%d window_direct_input=%d\n", (long long)rows, reps,
-              int(copts.window_direct_input));
+  std::printf("# tsq benchmark: rows=%lld reps=%d window_direct_input=%d mode=%s\n", (long long)rows, reps,
+              int(copts.window_direct_input), interp_only ? "interp-only" : run_interp ? "all" : "native-only");
   auto selected = [&](const std::string& name) {
     return only.empty() || ("," + only + ",").find("," + name + ",") != std::string::npos;
   };
@@ -169,8 +171,8 @@ int main(int argc, char** argv) {
     const Schema out_schema = jq->plan().output;
 
     // JIT cold: one run that allocates fresh output buffers (page faults included).
-    double tjc;
-    {
+    double tjc = 0;
+    if (!interp_only) {
       auto a = Clock::now();
       Result res = jq->run(bi);
       tjc = ms(a, Clock::now());
@@ -190,7 +192,7 @@ int main(int argc, char** argv) {
     std::vector<double> tj, th;
     int64_t jrows = 0, hrows = 0;
     uint64_t hj = 0, hh = 0;
-    for (int r = 0; r < reps + 1; ++r) {
+    for (int r = 0; r < (interp_only ? 1 : reps + 1); ++r) {
       auto a = Clock::now();
       jrows = jq->run_raw(bi, outp.data());
       auto b = Clock::now();
@@ -228,6 +230,7 @@ int main(int argc, char** argv) {
     }
     bool match = hj == hh && hj == hi && jrows == hrows && jrows == irows;
     all_match &= match;
+    if (interp_only) tj = th = {0.0};
     double mi = run_interp ? median(ti) : 0, mj = median(tj), mh = median(th);
     double nj = *std::min_element(tj.begin(), tj.end()), nh = *std::min_element(th.begin(), th.end());
     std::printf("%-15s %10lld %10.1f %9.1f %9.1f %9.1f %9.1f %9.1f %8.2f %8.3f %8.3f %8.3f %8.3f %8.2f %8.2f %8.2f %6s\n",
