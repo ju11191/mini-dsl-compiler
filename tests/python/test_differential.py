@@ -73,6 +73,14 @@ def test_random_query(case):
 
     jit = tsq.compile(text, backend="jit").run(tables, symbols)
     interp = tsq.compile(text, backend="interp").run(tables, symbols)
+    # The JIT without its window optimizations, and without LLVM optimization,
+    # must give the same bits too.
+    variants = {
+        "jit-noopt-windows": tsq.compile(
+            text, window_direct_input=False, window_output_history=False
+        ).run(tables, symbols),
+        "jit-O0": tsq.compile(text, opt_level=0).run(tables, symbols),
+    }
     with warnings.catch_warnings(), np.errstate(all="ignore"):
         warnings.simplefilter("ignore")
         ref = reference(tables)
@@ -81,6 +89,8 @@ def test_random_query(case):
     for c in jit:
         # JIT and interpreter must agree bit-for-bit (NaN == NaN).
         np.testing.assert_array_equal(jit[c], interp[c], err_msg=f"jit vs interp, column {c}{ctx}")
+        for vname, v in variants.items():
+            np.testing.assert_array_equal(v[c], interp[c], err_msg=f"{vname} vs interp, {c}{ctx}")
         assert jit[c].dtype == {"i64": np.int64, "f64": np.float64, "sym": np.int32}[ref.types[c]]
         # pandas computes window aggregates in float with different algorithms
         # (Kahan sums), so those columns are compared with a tolerance.

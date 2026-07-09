@@ -3,7 +3,7 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 PY=${PYTHON:-$PWD/.venv/bin/python}
-cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DPython_EXECUTABLE="$PY" >/dev/null
+cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DTSQ_BUILD_PYTHON=ON -DPython_EXECUTABLE="$PY" >/dev/null
 cmake --build build
 cmake -S . -B build-debug -G Ninja -DCMAKE_BUILD_TYPE=Debug >/dev/null
 cmake --build build-debug

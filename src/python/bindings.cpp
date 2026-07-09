@@ -145,7 +145,7 @@ PYBIND11_MODULE(_core, m) {
   m.def(
       "compile",
       [](const std::string& text, const std::map<std::string, std::vector<std::pair<std::string, std::string>>>& schema,
-         const std::string& backend, int opt_level) {
+         const std::string& backend, int opt_level, bool window_direct_input, bool window_output_history) {
         Catalog cat;
         for (const auto& [tname, cols] : schema)
           for (const auto& [cname, ty] : cols) cat.tables[tname].push_back(ColumnDef{cname, parse_type(ty)});
@@ -153,13 +153,16 @@ PYBIND11_MODULE(_core, m) {
           throw py::value_error("backend must be 'jit' or 'interp'");
         CompileOptions opts;
         opts.opt_level = opt_level;
+        opts.window_direct_input = window_direct_input;
+        opts.window_output_history = window_output_history;
         try {
           return PyQuery(CompiledQuery::compile(text, cat, backend == "jit" ? Backend::Jit : Backend::Interp, opts));
         } catch (const CompileError& e) {
           raise_compile_error(e, text);
         }
       },
-      py::arg("query"), py::arg("schema"), py::arg("backend") = "jit", py::arg("opt_level") = 2);
+      py::arg("query"), py::arg("schema"), py::arg("backend") = "jit", py::arg("opt_level") = 2,
+      py::arg("window_direct_input") = true, py::arg("window_output_history") = true);
 
   m.def(
       "parse",

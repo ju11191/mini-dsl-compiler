@@ -33,12 +33,15 @@ def infer_schema(tables: Mapping[str, Mapping[str, np.ndarray]]) -> Schema:
 class Query:
     """A compiled query. Native code is generated once per input schema."""
 
-    def __init__(self, text: str, schema: Schema | None, backend: str, opt_level: int):
+    def __init__(
+        self, text: str, schema: Schema | None, backend: str, opt_level: int, options: dict
+    ):
         if backend not in ("jit", "interp"):
             raise ValueError("backend must be 'jit' or 'interp'")
         self.text = text
         self.backend = backend
         self.opt_level = opt_level
+        self.options = options
         # Syntax errors surface immediately, even before a schema is known.
         self.canonical, self.tables = _core.parse(text)
         self._cache: dict[tuple, _core.Query] = {}
@@ -51,7 +54,7 @@ class Query:
         key = tuple(sorted((t, tuple(cols)) for t, cols in relevant.items()))
         q = self._cache.get(key)
         if q is None:
-            q = _core.compile(self.text, relevant, self.backend, self.opt_level)
+            q = _core.compile(self.text, relevant, self.backend, self.opt_level, **self.options)
             self._cache[key] = q
         self._last = q
         return q
@@ -97,14 +100,26 @@ class Query:
 
 
 def compile(
-    query: str, schema: Schema | None = None, backend: str = "jit", opt_level: int = 2
+    query: str,
+    schema: Schema | None = None,
+    backend: str = "jit",
+    opt_level: int = 2,
+    *,
+    window_direct_input: bool = True,
+    window_output_history: bool = True,
 ) -> Query:  # noqa: A001 - the spec asks for tsq.compile
     """Compile a query.
 
     schema: {table: [(column, "i64"|"f64"|"sym"), ...]}. If omitted it is inferred
     from the numpy dtypes on the first run() (and cached per schema).
+    opt_level: 0 skips the LLVM optimization pipeline, 2 runs the default -O2 one.
+    window_*: JIT optimizations, exposed for testing/benchmarking.
     """
-    return Query(query, schema, backend, opt_level)
+    options = {
+        "window_direct_input": window_direct_input,
+        "window_output_history": window_output_history,
+    }
+    return Query(query, schema, backend, opt_level, options)
 
 
 def to_pandas(result: Mapping[str, np.ndarray], symbols: Sequence[str] | None = None):
