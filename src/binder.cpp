@@ -8,7 +8,9 @@ namespace tsq {
 
 namespace {
 
-[[noreturn]] void fail(const std::string& msg, SourceLoc loc) { throw CompileError(msg, loc); }
+[[noreturn]] void fail(const std::string& msg, SourceLoc loc) {
+  throw CompileError(msg, loc);
+}
 
 std::string column_suggestion(const Schema& s, const std::string& name) {
   std::string best;
@@ -23,7 +25,8 @@ std::string column_suggestion(const Schema& s, const std::string& name) {
   std::string out;
   if (!best.empty()) out += " (did you mean '" + best + "'?)";
   out += "; available columns: ";
-  for (size_t i = 0; i < s.size(); ++i) out += (i ? ", " : "") + s[i].name;
+  for (size_t i = 0; i < s.size(); ++i)
+    out += (i ? ", " : "") + s[i].name;
   return out;
 }
 
@@ -46,7 +49,9 @@ BExprPtr cast_f64(BExprPtr e) {
   return c;
 }
 
-bool is_numeric(Type t) { return t == Type::I64 || t == Type::F64; }
+bool is_numeric(Type t) {
+  return t == Type::I64 || t == Type::F64;
+}
 
 class Binder {
 public:
@@ -101,7 +106,9 @@ private:
 
   void check_storable(Type t, const std::string& name, SourceLoc loc) {
     if (t == Type::Bool)
-      fail("column '" + name + "' would have type bool, which cannot be stored; use the condition in a filter", loc);
+      fail("column '" + name +
+               "' would have type bool, which cannot be stored; use the condition in a filter",
+           loc);
   }
 
   BStage stage(const Stage& st, Schema in) {
@@ -111,7 +118,8 @@ private:
       out.kind = BStage::Kind::Filter;
       out.pred = expr(*st.pred, in);
       if (out.pred->type != Type::Bool)
-        fail(std::string("filter predicate must be bool, but this expression is ") + type_name(out.pred->type),
+        fail(std::string("filter predicate must be bool, but this expression is ") +
+                 type_name(out.pred->type),
              st.pred->loc);
       out.out = in;
       break;
@@ -141,7 +149,8 @@ private:
         check_storable(e->type, item.name, item.expr ? item.expr->loc : item.name_loc);
         if (find_column(result, item.name) >= 0) {
           if (derive && find_column(in, item.name) >= 0)
-            fail("column '" + item.name + "' already exists; derive only adds new columns (use select to replace it)",
+            fail("column '" + item.name +
+                     "' already exists; derive only adds new columns (use select to replace it)",
                  item.name_loc);
           fail("duplicate output column '" + item.name + "'", item.name_loc);
         }
@@ -170,8 +179,8 @@ private:
           b.col = resolve(in, a.col, a.col_loc);
           b.in_type = in[b.col].type;
           if (!is_numeric(b.in_type))
-            fail(std::string(aggfn_str(a.fn)) + "() needs a numeric column, but '" + a.col + "' is " +
-                     type_name(b.in_type),
+            fail(std::string(aggfn_str(a.fn)) + "() needs a numeric column, but '" + a.col +
+                     "' is " + type_name(b.in_type),
                  a.col_loc);
           b.out_type = a.fn == AggFn::Mean ? Type::F64 : b.in_type;
           b.name = a.alias.empty() ? std::string(aggfn_str(a.fn)) + "_" + a.col : a.alias;
@@ -199,7 +208,8 @@ private:
       out.right_table = rt;
       out.left_key = find_column(in, st.key);
       if (out.left_key < 0)
-        fail("join key '" + st.key + "' is not a column of the left side" + column_suggestion(in, st.key),
+        fail("join key '" + st.key + "' is not a column of the left side" +
+                 column_suggestion(in, st.key),
              st.key_loc);
       out.right_key = find_column(right, st.key);
       if (out.right_key < 0)
@@ -241,7 +251,9 @@ private:
                " (was it dropped by an earlier select?)",
            loc);
     if (in[ts].type != Type::I64)
-      fail(std::string(what) + " needs 'ts' to be i64 nanoseconds, but it is " + type_name(in[ts].type), loc);
+      fail(std::string(what) + " needs 'ts' to be i64 nanoseconds, but it is " +
+               type_name(in[ts].type),
+           loc);
     return ts;
   }
 
@@ -283,7 +295,8 @@ private:
       auto x = expr(*e.args[0], in);
       if (e.uop == UnOp::Neg) {
         if (!is_numeric(x->type))
-          fail(std::string("unary '-' needs a numeric operand, found ") + type_name(x->type), e.loc);
+          fail(std::string("unary '-' needs a numeric operand, found ") + type_name(x->type),
+               e.loc);
         auto b = mk(BExpr::Kind::Neg, x->type);
         b->kids.push_back(std::move(x));
         return b;
@@ -298,7 +311,8 @@ private:
       bool is_abs = e.name == "abs", is_sqrt = e.name == "sqrt";
       if (!is_abs && !is_sqrt) {
         std::string hint;
-        if (e.name == "sum" || e.name == "mean" || e.name == "min" || e.name == "max" || e.name == "count")
+        if (e.name == "sum" || e.name == "mean" || e.name == "min" || e.name == "max" ||
+            e.name == "count")
           hint = " ('" + e.name + "' is an aggregate; use it in a window stage)";
         fail("unknown function '" + e.name + "'" + hint + "; functions are abs, sqrt", e.loc);
       }
@@ -311,7 +325,8 @@ private:
       b->kids.push_back(std::move(x));
       return b;
     }
-    case Expr::Kind::Binary: return binary(e, in);
+    case Expr::Kind::Binary:
+      return binary(e, in);
     }
     fail("internal: unhandled expression", e.loc);
   }
@@ -320,8 +335,8 @@ private:
     const Expr& le = *e.args[0];
     const Expr& re = *e.args[1];
     BinOp op = e.bop;
-    bool is_cmp = op == BinOp::Eq || op == BinOp::Ne || op == BinOp::Lt || op == BinOp::Le || op == BinOp::Gt ||
-                  op == BinOp::Ge;
+    bool is_cmp = op == BinOp::Eq || op == BinOp::Ne || op == BinOp::Lt || op == BinOp::Le ||
+                  op == BinOp::Gt || op == BinOp::Ge;
     bool is_eq = op == BinOp::Eq || op == BinOp::Ne;
 
     // sym == "literal" / "literal" == sym: bind the literal as a run-time parameter.
@@ -346,8 +361,8 @@ private:
     auto l = expr(le, in);
     auto r = expr(re, in);
     auto mismatch = [&](const char* what) {
-      fail(std::string("operator '") + binop_str(op) + "' " + what + ", found " + type_name(l->type) + " and " +
-               type_name(r->type),
+      fail(std::string("operator '") + binop_str(op) + "' " + what + ", found " +
+               type_name(l->type) + " and " + type_name(r->type),
            e.loc);
     };
 
@@ -368,9 +383,10 @@ private:
           r = cast_f64(std::move(r));
         }
       } else if (l->type == r->type && (l->type == Type::Sym || l->type == Type::Bool)) {
-        if (!is_eq) fail(std::string(type_name(l->type)) + " values only support == and !=, not '" +
-                             binop_str(op) + "'",
-                         e.loc);
+        if (!is_eq)
+          fail(std::string(type_name(l->type)) + " values only support == and !=, not '" +
+                   binop_str(op) + "'",
+               e.loc);
       } else {
         mismatch("cannot compare these types");
       }
@@ -394,11 +410,21 @@ private:
 
 void print(std::ostream& os, const BExpr& e, const Schema& in, const BoundQuery& q) {
   switch (e.kind) {
-  case BExpr::Kind::Col: os << in[e.col].name; break;
-  case BExpr::Kind::ConstI64: os << e.i; break;
-  case BExpr::Kind::ConstF64: os << e.f << "f"; break;
-  case BExpr::Kind::ConstBool: os << (e.b ? "true" : "false"); break;
-  case BExpr::Kind::SymParam: os << "sym\"" << q.sym_literals[e.param] << "\""; break;
+  case BExpr::Kind::Col:
+    os << in[e.col].name;
+    break;
+  case BExpr::Kind::ConstI64:
+    os << e.i;
+    break;
+  case BExpr::Kind::ConstF64:
+    os << e.f << "f";
+    break;
+  case BExpr::Kind::ConstBool:
+    os << (e.b ? "true" : "false");
+    break;
+  case BExpr::Kind::SymParam:
+    os << "sym\"" << q.sym_literals[e.param] << "\"";
+    break;
   case BExpr::Kind::CastF64:
     os << "f64(";
     print(os, *e.kids[0], in, q);
@@ -408,8 +434,10 @@ void print(std::ostream& os, const BExpr& e, const Schema& in, const BoundQuery&
   case BExpr::Kind::Not:
   case BExpr::Kind::Abs:
   case BExpr::Kind::Sqrt: {
-    const char* n = e.kind == BExpr::Kind::Neg ? "-" : e.kind == BExpr::Kind::Not ? "not " :
-                    e.kind == BExpr::Kind::Abs ? "abs" : "sqrt";
+    const char* n = e.kind == BExpr::Kind::Neg   ? "-"
+                    : e.kind == BExpr::Kind::Not ? "not "
+                    : e.kind == BExpr::Kind::Abs ? "abs"
+                                                 : "sqrt";
     os << n << "(";
     print(os, *e.kids[0], in, q);
     os << ")";
@@ -433,6 +461,8 @@ std::string to_string(const BExpr& e, const Schema& in, const BoundQuery& q) {
   return os.str();
 }
 
-BoundQuery bind(const Query& q, const Catalog& cat) { return Binder(cat).run(q); }
+BoundQuery bind(const Query& q, const Catalog& cat) {
+  return Binder(cat).run(q);
+}
 
 } // namespace tsq

@@ -56,7 +56,8 @@ public:
     for (size_t t = 0; t < q_.tables.size(); ++t) {
       std::vector<Value*> cols;
       for (size_t c = 0; c < q_.tables[t].schema.size(); ++c)
-        cols.push_back(load_ptr_at(inputs, flat++, q_.tables[t].name + "." + q_.tables[t].schema[c].name));
+        cols.push_back(
+            load_ptr_at(inputs, flat++, q_.tables[t].name + "." + q_.tables[t].schema[c].name));
       in_ptrs_.push_back(std::move(cols));
       in_lens_.push_back(load_i64_at(lens, int(t), "n." + q_.tables[t].name));
     }
@@ -64,7 +65,8 @@ public:
       out_ptrs_.push_back(load_ptr_at(outputs, int(c), "out." + q_.output[c].name));
     nsym_ = load_i64_at(params_, int(q_.sym_literals.size()), "nsym");
     for (size_t p = 0; p < q_.sym_literals.size(); ++p)
-      sym_params_.push_back(B_.CreateTrunc(load_i64_at(params_, int(p), "lit." + q_.sym_literals[p]), i32_));
+      sym_params_.push_back(
+          B_.CreateTrunc(load_i64_at(params_, int(p), "lit." + q_.sym_literals[p]), i32_));
 
     o_ = alloca_init(i64_, B_.getInt64(0), "o");
 
@@ -84,7 +86,8 @@ public:
 
     B_.SetInsertPoint(body);
     std::vector<Slot> cur;
-    for (size_t c = 0; c < q_.input().size(); ++c) cur.push_back(Slot{q_.input()[c].type, nullptr, int(c)});
+    for (size_t c = 0; c < q_.input().size(); ++c)
+      cur.push_back(Slot{q_.input()[c].type, nullptr, int(c)});
     src_cache_.assign(q_.input().size(), nullptr);
     rows_dropped_ = false;
 
@@ -93,10 +96,18 @@ public:
       const BStage& st = q_.stages[s];
       stage_idx_ = s;
       switch (st.kind) {
-      case BStage::Kind::Filter: emit_filter(st, cur); break;
-      case BStage::Kind::Project: emit_project(st, cur); break;
-      case BStage::Kind::Window: emit_window(st, cur); break;
-      case BStage::Kind::Asof: emit_asof(st, cur); break;
+      case BStage::Kind::Filter:
+        emit_filter(st, cur);
+        break;
+      case BStage::Kind::Project:
+        emit_project(st, cur);
+        break;
+      case BStage::Kind::Window:
+        emit_window(st, cur);
+        break;
+      case BStage::Kind::Asof:
+        emit_asof(st, cur);
+        break;
       }
     }
 
@@ -125,7 +136,8 @@ public:
 
     std::string err;
     raw_string_ostream es(err);
-    if (verifyFunction(*F_, &es)) throw std::runtime_error("internal: generated invalid IR: " + es.str());
+    if (verifyFunction(*F_, &es))
+      throw std::runtime_error("internal: generated invalid IR: " + es.str());
     return std::move(scratch_);
   }
 
@@ -180,10 +192,14 @@ private:
   // ---- helpers ----
   llvm::Type* storage_ty(Type t) {
     switch (t) {
-    case Type::I64: return i64_;
-    case Type::F64: return f64_;
-    case Type::Sym: return i32_;
-    case Type::Bool: return i1_;
+    case Type::I64:
+      return i64_;
+    case Type::F64:
+      return f64_;
+    case Type::Sym:
+      return i32_;
+    case Type::Bool:
+      return i1_;
     }
     return i64_;
   }
@@ -215,7 +231,8 @@ private:
     int idx = int(scratch_.size());
     scratch_.push_back(spec);
     IRBuilder<> sb(entry_);
-    return sb.CreateLoad(ptr_, sb.CreateConstInBoundsGEP1_64(ptr_, scratch_base_, uint64_t(idx)), name);
+    return sb.CreateLoad(ptr_, sb.CreateConstInBoundsGEP1_64(ptr_, scratch_base_, uint64_t(idx)),
+                         name);
   }
 
   Value* get(Slot& s) {
@@ -237,41 +254,61 @@ private:
   // ---- expressions ----
   Value* expr(const BExpr& e, std::vector<Slot>& cur) {
     switch (e.kind) {
-    case BExpr::Kind::Col: return get(cur[e.col]);
-    case BExpr::Kind::ConstI64: return B_.getInt64(uint64_t(e.i));
-    case BExpr::Kind::ConstF64: return ConstantFP::get(f64_, e.f);
-    case BExpr::Kind::ConstBool: return B_.getInt1(e.b);
-    case BExpr::Kind::SymParam: return sym_params_[e.param];
-    case BExpr::Kind::CastF64: return B_.CreateSIToFP(expr(*e.kids[0], cur), f64_);
+    case BExpr::Kind::Col:
+      return get(cur[e.col]);
+    case BExpr::Kind::ConstI64:
+      return B_.getInt64(uint64_t(e.i));
+    case BExpr::Kind::ConstF64:
+      return ConstantFP::get(f64_, e.f);
+    case BExpr::Kind::ConstBool:
+      return B_.getInt1(e.b);
+    case BExpr::Kind::SymParam:
+      return sym_params_[e.param];
+    case BExpr::Kind::CastF64:
+      return B_.CreateSIToFP(expr(*e.kids[0], cur), f64_);
     case BExpr::Kind::Neg: {
       Value* x = expr(*e.kids[0], cur);
       return e.type == Type::I64 ? B_.CreateSub(B_.getInt64(0), x) : B_.CreateFNeg(x);
     }
-    case BExpr::Kind::Not: return B_.CreateXor(expr(*e.kids[0], cur), B_.getInt1(true));
+    case BExpr::Kind::Not:
+      return B_.CreateXor(expr(*e.kids[0], cur), B_.getInt1(true));
     case BExpr::Kind::Abs: {
       Value* x = expr(*e.kids[0], cur);
       if (e.type == Type::I64) return intrinsic(Intrinsic::abs, i64_, {x, B_.getInt1(false)});
       return intrinsic(Intrinsic::fabs, f64_, {x});
     }
-    case BExpr::Kind::Sqrt: return intrinsic(Intrinsic::sqrt, f64_, {expr(*e.kids[0], cur)});
+    case BExpr::Kind::Sqrt:
+      return intrinsic(Intrinsic::sqrt, f64_, {expr(*e.kids[0], cur)});
     case BExpr::Kind::Bin: {
       Value* a = expr(*e.kids[0], cur);
       Value* b = expr(*e.kids[1], cur);
       Type t = e.kids[0]->type;
       bool fp = t == Type::F64;
       switch (e.op) {
-      case BinOp::Add: return fp ? B_.CreateFAdd(a, b) : B_.CreateAdd(a, b);
-      case BinOp::Sub: return fp ? B_.CreateFSub(a, b) : B_.CreateSub(a, b);
-      case BinOp::Mul: return fp ? B_.CreateFMul(a, b) : B_.CreateMul(a, b);
-      case BinOp::Div: return B_.CreateFDiv(a, b);
-      case BinOp::Eq: return fp ? B_.CreateFCmpOEQ(a, b) : B_.CreateICmpEQ(a, b);
-      case BinOp::Ne: return fp ? B_.CreateFCmpUNE(a, b) : B_.CreateICmpNE(a, b);
-      case BinOp::Lt: return fp ? B_.CreateFCmpOLT(a, b) : B_.CreateICmpSLT(a, b);
-      case BinOp::Le: return fp ? B_.CreateFCmpOLE(a, b) : B_.CreateICmpSLE(a, b);
-      case BinOp::Gt: return fp ? B_.CreateFCmpOGT(a, b) : B_.CreateICmpSGT(a, b);
-      case BinOp::Ge: return fp ? B_.CreateFCmpOGE(a, b) : B_.CreateICmpSGE(a, b);
-      case BinOp::And: return B_.CreateAnd(a, b);
-      case BinOp::Or: return B_.CreateOr(a, b);
+      case BinOp::Add:
+        return fp ? B_.CreateFAdd(a, b) : B_.CreateAdd(a, b);
+      case BinOp::Sub:
+        return fp ? B_.CreateFSub(a, b) : B_.CreateSub(a, b);
+      case BinOp::Mul:
+        return fp ? B_.CreateFMul(a, b) : B_.CreateMul(a, b);
+      case BinOp::Div:
+        return B_.CreateFDiv(a, b);
+      case BinOp::Eq:
+        return fp ? B_.CreateFCmpOEQ(a, b) : B_.CreateICmpEQ(a, b);
+      case BinOp::Ne:
+        return fp ? B_.CreateFCmpUNE(a, b) : B_.CreateICmpNE(a, b);
+      case BinOp::Lt:
+        return fp ? B_.CreateFCmpOLT(a, b) : B_.CreateICmpSLT(a, b);
+      case BinOp::Le:
+        return fp ? B_.CreateFCmpOLE(a, b) : B_.CreateICmpSLE(a, b);
+      case BinOp::Gt:
+        return fp ? B_.CreateFCmpOGT(a, b) : B_.CreateICmpSGT(a, b);
+      case BinOp::Ge:
+        return fp ? B_.CreateFCmpOGE(a, b) : B_.CreateICmpSGE(a, b);
+      case BinOp::And:
+        return B_.CreateAnd(a, b);
+      case BinOp::Or:
+        return B_.CreateOr(a, b);
       }
     }
     }
@@ -290,8 +327,10 @@ private:
   void emit_project(const BStage& st, std::vector<Slot>& cur) {
     std::vector<Slot> next;
     for (const auto& e : st.exprs) {
-      if (e->kind == BExpr::Kind::Col) next.push_back(cur[e->col]); // keeps laziness
-      else next.push_back(Slot{e->type, expr(*e, cur), -1});
+      if (e->kind == BExpr::Kind::Col)
+        next.push_back(cur[e->col]); // keeps laziness
+      else
+        next.push_back(Slot{e->type, expr(*e, cur), -1});
     }
     cur = std::move(next);
   }
@@ -346,7 +385,8 @@ private:
       xhist[c] = direct(c);
       if (!xhist[c]) xhist[c] = out_hist(c, v);
       if (!xhist[c]) {
-        xhist[c] = add_scratch({8, ScratchSpec::Len::SourceRows, false, 0}, "win.hist." + cur_name(st, c));
+        xhist[c] =
+            add_scratch({8, ScratchSpec::Len::SourceRows, false, 0}, "win.hist." + cur_name(st, c));
         gep_store(v, xhist[c], k);
       }
     }
@@ -384,7 +424,8 @@ private:
       llvm::Type* ty = value_ty(g.in_type);
       Value* x_old = gep_load(ty, xhist[g.col], s, "x.old");
       Value* sum = B_.CreateLoad(ty, sumA[a]);
-      B_.CreateStore(g.in_type == Type::F64 ? B_.CreateFSub(sum, x_old) : B_.CreateSub(sum, x_old), sumA[a]);
+      B_.CreateStore(g.in_type == Type::F64 ? B_.CreateFSub(sum, x_old) : B_.CreateSub(sum, x_old),
+                     sumA[a]);
     }
     B_.CreateStore(B_.CreateAdd(s, B_.getInt64(1)), startA);
     B_.CreateBr(ev_cond);
@@ -401,7 +442,9 @@ private:
       bool fp = g.in_type == Type::F64;
       Value* result = nullptr;
       switch (g.fn) {
-      case AggFn::Count: result = count; break;
+      case AggFn::Count:
+        result = count;
+        break;
       case AggFn::Sum:
       case AggFn::Mean: {
         Value* sum = B_.CreateLoad(ty, sumA[a]);
@@ -409,8 +452,11 @@ private:
         Value* x = xval[g.col];
         sum = fp ? B_.CreateFAdd(sum, x) : B_.CreateAdd(sum, x);
         B_.CreateStore(sum, sumA[a]);
-        if (g.fn == AggFn::Sum) result = sum;
-        else result = B_.CreateFDiv(fp ? sum : B_.CreateSIToFP(sum, f64_), B_.CreateSIToFP(count, f64_), "mean");
+        if (g.fn == AggFn::Sum)
+          result = sum;
+        else
+          result = B_.CreateFDiv(fp ? sum : B_.CreateSIToFP(sum, f64_),
+                                 B_.CreateSIToFP(count, f64_), "mean");
         break;
       }
       case AggFn::Min:
@@ -461,7 +507,8 @@ private:
       outs.push_back(Slot{g.out_type, result, -1});
     }
     B_.CreateStore(B_.CreateAdd(k, B_.getInt64(1)), kA);
-    for (auto& o : outs) cur.push_back(o);
+    for (auto& o : outs)
+      cur.push_back(o);
   }
 
   std::string cur_name(const BStage& st, int c) {

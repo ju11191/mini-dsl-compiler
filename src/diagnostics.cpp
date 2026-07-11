@@ -23,14 +23,17 @@ std::string CompileError::render(std::string_view src) const {
   os << "  " << std::string(gutter.size(), ' ') << " |\n";
   os << "  " << gutter << " | " << line << "\n";
   size_t caret_col = off - begin;
-  size_t len = std::max<size_t>(1, std::min<size_t>(loc_.len, line.size() > caret_col ? line.size() - caret_col : 1));
-  os << "  " << std::string(gutter.size(), ' ') << " | " << std::string(caret_col, ' ') << std::string(len, '^');
+  size_t len = std::max<size_t>(
+      1, std::min<size_t>(loc_.len, line.size() > caret_col ? line.size() - caret_col : 1));
+  os << "  " << std::string(gutter.size(), ' ') << " | " << std::string(caret_col, ' ')
+     << std::string(len, '^');
   return os.str();
 }
 
 size_t edit_distance(std::string_view a, std::string_view b) {
   std::vector<size_t> prev(b.size() + 1), cur(b.size() + 1);
-  for (size_t j = 0; j <= b.size(); ++j) prev[j] = j;
+  for (size_t j = 0; j <= b.size(); ++j)
+    prev[j] = j;
   for (size_t i = 1; i <= a.size(); ++i) {
     cur[0] = i;
     for (size_t j = 1; j <= b.size(); ++j) {

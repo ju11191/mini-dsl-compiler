@@ -58,19 +58,18 @@ TEST_P(JitVsInterp, Identical) {
 INSTANTIATE_TEST_SUITE_P(
     FilterProject, JitVsInterp,
     ::testing::Values(
-        "trades",
-        "trades | filter price > 100",
-        R"(trades | filter price > 100 and sym == "AAPL")",
-        R"(trades | filter sym != "MSFT" or size < 10)",
-        R"(trades | filter sym == "NOPE")",
+        "trades", "trades | filter price > 100", R"(trades | filter price > 100 and sym == "AAPL")",
+        R"(trades | filter sym != "MSFT" or size < 10)", R"(trades | filter sym == "NOPE")",
         "trades | filter not (size > 500) and price <= 100.5",
-        "trades | filter size == 7 or size != size",
-        "trades | filter false",
+        "trades | filter size == 7 or size != size", "trades | filter false",
         "trades | filter true and price * size / 3 > 20000",
         "trades | select ts, notional = price * size",
-        "trades | select a = size - 500, b = -price, c = abs(size - 500), d = abs(-price), e = sqrt(price)",
-        "trades | derive x = size * 3 + 1, y = size / 7, z = ts - 1704205800000000000 | filter x > 1000 | select z, y",
-        "trades | filter price > 100 | derive n = price * size | filter n > 50000 | select ts, sym, n",
+        "trades | select a = size - 500, b = -price, c = abs(size - 500), d = abs(-price), e = "
+        "sqrt(price)",
+        "trades | derive x = size * 3 + 1, y = size / 7, z = ts - 1704205800000000000 | filter x > "
+        "1000 | select z, y",
+        "trades | filter price > 100 | derive n = price * size | filter n > 50000 | select ts, "
+        "sym, n",
         "trades | select sym, ts | filter sym == \"GOOG\"",
         "trades | derive big = 9223372036854775807 + size, m = size * 4611686018427387904"));
 
@@ -78,7 +77,8 @@ INSTANTIATE_TEST_SUITE_P(
     Window, JitVsInterp,
     ::testing::Values(
         "trades | window 5m mean(price)",
-        "trades | window 10ms sum(size), sum(price), mean(size), mean(price), min(price), max(price), min(size), "
+        "trades | window 10ms sum(size), sum(price), mean(size), mean(price), min(price), "
+        "max(price), min(size), "
         "max(size), count()",
         "trades | window 1ns count(), max(price)",
         "trades | window 1d sum(size) as total, min(price) as lo",
@@ -99,8 +99,9 @@ INSTANTIATE_TEST_SUITE_P(
         "trades | asof_join quotes on sym | window 1s max(ask)"));
 
 TEST(Jit, IrIsOneFusedLoop) {
-  auto q = CompiledQuery::compile(R"(trades | filter price > 100 and sym == "AAPL" | select ts, n = price * size)",
-                                  trades_quotes_catalog(), Backend::Jit);
+  auto q = CompiledQuery::compile(
+      R"(trades | filter price > 100 and sym == "AAPL" | select ts, n = price * size)",
+      trades_quotes_catalog(), Backend::Jit);
   const std::string& ir = q->ir_optimized();
   EXPECT_NE(ir.find("define i64 @tsq_query"), std::string::npos);
   EXPECT_EQ(ir.find("call "), std::string::npos) << "fused loop should not call anything:\n" << ir;
@@ -121,7 +122,8 @@ TEST(Jit, WindowDirectInputSkipsHistoryCopy) {
   EXPECT_NE(a->ir_unoptimized().find("win.hist.ts"), std::string::npos);
   EXPECT_EQ(b->ir_unoptimized().find("win.hist."), std::string::npos) << b->ir_unoptimized();
   // After a filter the window input is no longer the source rows: history is copied.
-  auto c = CompiledQuery::compile("trades | filter size > 5 | window 5m max(price)", cat, Backend::Jit, direct);
+  auto c = CompiledQuery::compile("trades | filter size > 5 | window 5m max(price)", cat,
+                                  Backend::Jit, direct);
   EXPECT_NE(c->ir_unoptimized().find("win.hist.ts"), std::string::npos);
 }
 
@@ -130,22 +132,26 @@ TEST(Jit, WindowOutputHistory) {
   CompileOptions o;
   o.window_output_history = true;
   // Filter before the window, none after: ts/price history lives in the outputs.
-  auto a = CompiledQuery::compile(R"(trades | filter sym == "AAPL" | window 5m mean(price) | asof_join quotes on sym)",
-                                  cat, Backend::Jit, o);
+  auto a = CompiledQuery::compile(
+      R"(trades | filter sym == "AAPL" | window 5m mean(price) | asof_join quotes on sym)", cat,
+      Backend::Jit, o);
   EXPECT_EQ(a->ir_unoptimized().find("win.hist."), std::string::npos) << a->ir_unoptimized();
   // A filter after the window: rows may be dropped, so history needs scratch.
-  auto b = CompiledQuery::compile(R"(trades | filter sym == "AAPL" | window 5m mean(price) | filter size > 3)", cat,
-                                  Backend::Jit, o);
+  auto b = CompiledQuery::compile(
+      R"(trades | filter sym == "AAPL" | window 5m mean(price) | filter size > 3)", cat,
+      Backend::Jit, o);
   EXPECT_NE(b->ir_unoptimized().find("win.hist.ts"), std::string::npos);
   // price is dropped by the select, so its history needs scratch; ts survives.
-  auto c = CompiledQuery::compile(R"(trades | filter sym == "AAPL" | window 5m mean(price) | select ts, mean_price)",
-                                  cat, Backend::Jit, o);
+  auto c = CompiledQuery::compile(
+      R"(trades | filter sym == "AAPL" | window 5m mean(price) | select ts, mean_price)", cat,
+      Backend::Jit, o);
   EXPECT_EQ(c->ir_unoptimized().find("win.hist.ts"), std::string::npos);
   EXPECT_NE(c->ir_unoptimized().find("win.hist.price"), std::string::npos);
 }
 
 TEST(Jit, RunRawIntoCallerBuffers) {
-  auto q = CompiledQuery::compile("trades | filter size > 990 | select ts, size", trades_quotes_catalog(), Backend::Jit);
+  auto q = CompiledQuery::compile("trades | filter size > 990 | select ts, size",
+                                  trades_quotes_catalog(), Backend::Jit);
   auto bi = q->bind_inputs(data().tables(), syms());
   std::vector<int64_t> ts(size_t(data().trades.rows)), size(size_t(data().trades.rows));
   void* outs[] = {ts.data(), size.data()};
@@ -163,7 +169,9 @@ TEST(Jit, EmptyInput) {
   auto q = make_quotes({}, {}, {}, {});
   NamedTables nt{{"trades", named(t)}, {"quotes", named(q)}};
   EXPECT_EQ(run_query("trades | filter price > 1 | select ts", Backend::Jit, nt).rows, 0);
-  EXPECT_EQ(run_query("trades | window 1s max(price) | asof_join quotes on sym", Backend::Jit, nt).rows, 0);
+  EXPECT_EQ(
+      run_query("trades | window 1s max(price) | asof_join quotes on sym", Backend::Jit, nt).rows,
+      0);
 }
 
 TEST(Jit, AsofEmptyRightSideGivesNaN) {
@@ -183,12 +191,15 @@ TEST(Jit, HandComputedWindowAndAsof) {
   auto q = make_quotes({0 * S, 2 * S, 2 * S, 5 * S}, {0, 1, 0, 0}, {99.0, 149.0, 100.0, 119.0},
                        {100.0, 151.0, 102.0, 121.0});
   NamedTables nt{{"trades", named(t)}, {"quotes", named(q)}};
-  auto r = run_query(R"(trades | filter price > 100 and sym == "AAPL" | window 5m mean(price) | asof_join quotes on sym)",
-                     Backend::Jit, nt);
+  auto r = run_query(
+      R"(trades | filter price > 100 and sym == "AAPL" | window 5m mean(price) | asof_join quotes on sym)",
+      Backend::Jit, nt);
   EXPECT_EQ(col_values<double>(r, "mean_price"), (std::vector<double>{101.0, 110.5}));
   EXPECT_EQ(col_values<double>(r, "bid"), (std::vector<double>{100.0, 119.0}));
   auto w = run_query("trades | window 2s min(price), max(price), sum(size)", Backend::Jit, nt);
-  EXPECT_EQ(col_values<double>(w, "min_price"), (std::vector<double>{99.5, 99.5, 101.0, 100.0, 100.0, 80.0}));
-  EXPECT_EQ(col_values<double>(w, "max_price"), (std::vector<double>{99.5, 150.0, 150.0, 101.0, 120.0, 120.0}));
+  EXPECT_EQ(col_values<double>(w, "min_price"),
+            (std::vector<double>{99.5, 99.5, 101.0, 100.0, 100.0, 80.0}));
+  EXPECT_EQ(col_values<double>(w, "max_price"),
+            (std::vector<double>{99.5, 150.0, 150.0, 101.0, 120.0, 120.0}));
   EXPECT_EQ(col_values<int64_t>(w, "sum_size"), (std::vector<int64_t>{10, 30, 50, 70, 90, 110}));
 }

@@ -18,22 +18,28 @@ using namespace tsq;
 namespace {
 
 void usage() {
-  std::cerr << "usage: tsqc [--backend jit|interp] [--rows N] [--seed S] [--head K] [--time]\n"
-               "            [--emit ast|plan|ir|ir-opt] [-O0|-O2] '<query>'\n"
-               "Runs the query on synthetic tables `trades` (ts, sym, price, size) and\n"
-               "`quotes` (ts, sym, bid, ask) with symbols AAPL MSFT GOOG AMZN META NVDA TSLA JPM.\n";
+  std::cerr
+      << "usage: tsqc [--backend jit|interp] [--rows N] [--seed S] [--head K] [--time]\n"
+         "            [--emit ast|plan|ir|ir-opt] [-O0|-O2] '<query>'\n"
+         "Runs the query on synthetic tables `trades` (ts, sym, price, size) and\n"
+         "`quotes` (ts, sym, bid, ask) with symbols AAPL MSFT GOOG AMZN META NVDA TSLA JPM.\n";
 }
 
 void print_value(const Column& c, int64_t i, const std::vector<std::string>& syms) {
   switch (c.type) {
-  case Type::I64: std::printf("%20lld", (long long)c.as<int64_t>()[i]); break;
-  case Type::F64: std::printf("%14.4f", c.as<double>()[i]); break;
+  case Type::I64:
+    std::printf("%20lld", (long long)c.as<int64_t>()[i]);
+    break;
+  case Type::F64:
+    std::printf("%14.4f", c.as<double>()[i]);
+    break;
   case Type::Sym: {
     int32_t code = c.as<int32_t>()[i];
     std::printf("%6s", code >= 0 && size_t(code) < syms.size() ? syms[size_t(code)].c_str() : "?");
     break;
   }
-  case Type::Bool: break;
+  case Type::Bool:
+    break;
   }
 }
 
@@ -60,20 +66,28 @@ int main(int argc, char** argv) {
     if (a == "--backend") {
       std::string b = need();
       backend = b == "interp" ? Backend::Interp : Backend::Jit;
-    } else if (a == "--rows") rows = std::stoll(need());
-    else if (a == "--seed") seed = std::stoull(need());
-    else if (a == "--head") head = std::stoll(need());
-    else if (a == "--time") timing = true;
-    else if (a == "--emit") emit = need();
-    else if (a == "-O0") opts.opt_level = 0;
-    else if (a == "-O2") opts.opt_level = 2;
+    } else if (a == "--rows")
+      rows = std::stoll(need());
+    else if (a == "--seed")
+      seed = std::stoull(need());
+    else if (a == "--head")
+      head = std::stoll(need());
+    else if (a == "--time")
+      timing = true;
+    else if (a == "--emit")
+      emit = need();
+    else if (a == "-O0")
+      opts.opt_level = 0;
+    else if (a == "-O2")
+      opts.opt_level = 2;
     else if (a == "-h" || a == "--help") {
       usage();
       return 0;
     } else if (!a.empty() && a[0] == '-') {
       usage();
       return 2;
-    } else query = a;
+    } else
+      query = a;
   }
   if (query.empty()) {
     usage();
@@ -81,8 +95,10 @@ int main(int argc, char** argv) {
   }
 
   Catalog cat;
-  cat.tables["trades"] = {{"ts", Type::I64}, {"sym", Type::Sym}, {"price", Type::F64}, {"size", Type::I64}};
-  cat.tables["quotes"] = {{"ts", Type::I64}, {"sym", Type::Sym}, {"bid", Type::F64}, {"ask", Type::F64}};
+  cat.tables["trades"] = {
+      {"ts", Type::I64}, {"sym", Type::Sym}, {"price", Type::F64}, {"size", Type::I64}};
+  cat.tables["quotes"] = {
+      {"ts", Type::I64}, {"sym", Type::Sym}, {"bid", Type::F64}, {"ask", Type::F64}};
 
   try {
     if (emit == "ast") {
@@ -93,8 +109,10 @@ int main(int argc, char** argv) {
       BoundQuery bq = bind(parse(query), cat);
       for (size_t s = 0; s < bq.stages.size(); ++s) {
         const BStage& st = bq.stages[s];
-        const char* k = st.kind == BStage::Kind::Filter ? "Filter" : st.kind == BStage::Kind::Project ? "Project"
-                        : st.kind == BStage::Kind::Window ? "Window" : "Asof";
+        const char* k = st.kind == BStage::Kind::Filter    ? "Filter"
+                        : st.kind == BStage::Kind::Project ? "Project"
+                        : st.kind == BStage::Kind::Window  ? "Window"
+                                                           : "Asof";
         std::cout << s << ": " << k;
         if (st.pred) std::cout << " " << to_string(*st.pred, bq.stage_input(s), bq);
         std::cout << "\n   -> " << schema_to_string(st.out) << "\n";
@@ -123,7 +141,8 @@ int main(int argc, char** argv) {
     auto bi = q->bind_inputs(tables, symbols);
     auto t0 = std::chrono::steady_clock::now();
     Result r = q->run(bi);
-    double run_ms = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count();
+    double run_ms =
+        std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count();
 
     for (const auto& c : r.cols) {
       int w = c.type == Type::I64 ? 20 : c.type == Type::F64 ? 14 : 6;
@@ -140,9 +159,10 @@ int main(int argc, char** argv) {
     std::printf("(%lld of %lld rows)\n", (long long)r.rows, (long long)rows);
     if (timing) {
       const auto& s = q->stats();
-      std::printf("backend=%s parse+bind=%.3fms irgen=%.3fms opt=%.3fms codegen=%.3fms run=%.3fms\n",
-                  backend == Backend::Jit ? "jit" : "interp", s.parse_bind_ms, s.irgen_ms, s.optimize_ms,
-                  s.codegen_ms, run_ms);
+      std::printf(
+          "backend=%s parse+bind=%.3fms irgen=%.3fms opt=%.3fms codegen=%.3fms run=%.3fms\n",
+          backend == Backend::Jit ? "jit" : "interp", s.parse_bind_ms, s.irgen_ms, s.optimize_ms,
+          s.codegen_ms, run_ms);
     }
   } catch (const CompileError& e) {
     std::cerr << e.render(query) << "\n";

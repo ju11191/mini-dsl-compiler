@@ -30,7 +30,9 @@ using Clock = std::chrono::steady_clock;
 
 namespace {
 
-double ms(Clock::time_point a, Clock::time_point b) { return std::chrono::duration<double, std::milli>(b - a).count(); }
+double ms(Clock::time_point a, Clock::time_point b) {
+  return std::chrono::duration<double, std::milli>(b - a).count();
+}
 
 double median(std::vector<double> v) {
   std::sort(v.begin(), v.end());
@@ -47,7 +49,8 @@ uint64_t hash_bytes(const void* p, size_t bytes, uint64_t h) {
     h = (h ^ w) * 0x100000001b3ULL;
     h ^= h >> 29;
   }
-  for (size_t i = words * 8; i < bytes; ++i) h = (h ^ b[i]) * 0x100000001b3ULL;
+  for (size_t i = words * 8; i < bytes; ++i)
+    h = (h ^ b[i]) * 0x100000001b3ULL;
   return h;
 }
 
@@ -94,15 +97,23 @@ int main(int argc, char** argv) {
   CompileOptions copts;
   for (int i = 1; i < argc; ++i) {
     std::string a = argv[i];
-    if (a == "--rows" && i + 1 < argc) rows = std::stoll(argv[++i]);
-    else if (a == "--reps" && i + 1 < argc) reps = std::stoi(argv[++i]);
-    else if (a == "--only" && i + 1 < argc) only = argv[++i];
-    else if (a == "--no-interp") run_interp = false;
-    else if (a == "--interp-only") interp_only = true;
-    else if (a == "--window-direct" && i + 1 < argc) copts.window_direct_input = std::stoi(argv[++i]) != 0;
-    else if (a == "--window-outhist" && i + 1 < argc) copts.window_output_history = std::stoi(argv[++i]) != 0;
+    if (a == "--rows" && i + 1 < argc)
+      rows = std::stoll(argv[++i]);
+    else if (a == "--reps" && i + 1 < argc)
+      reps = std::stoi(argv[++i]);
+    else if (a == "--only" && i + 1 < argc)
+      only = argv[++i];
+    else if (a == "--no-interp")
+      run_interp = false;
+    else if (a == "--interp-only")
+      interp_only = true;
+    else if (a == "--window-direct" && i + 1 < argc)
+      copts.window_direct_input = std::stoi(argv[++i]) != 0;
+    else if (a == "--window-outhist" && i + 1 < argc)
+      copts.window_output_history = std::stoi(argv[++i]) != 0;
     else {
-      std::fprintf(stderr, "usage: bench_queries [--rows N] [--reps R] [--only a,b] [--no-interp | --interp-only] [--window-direct 0|1] [--window-outhist 0|1]\n");
+      std::fprintf(stderr, "usage: bench_queries [--rows N] [--reps R] [--only a,b] [--no-interp | "
+                           "--interp-only] [--window-direct 0|1] [--window-outhist 0|1]\n");
       return 2;
     }
   }
@@ -114,21 +125,30 @@ int main(int argc, char** argv) {
        [](const hw::In& in, void* const* o, hw::Scratch&) { return hw::filter_bitand(in, o); }},
       {"filter_wide", R"(trades | filter price > 100 | select ts, sym, price)",
        [](const hw::In& in, void* const* o, hw::Scratch&) { return hw::filter_wide(in, o); }},
-      {"filter_project", R"(trades | filter price > 100 and size < 500 | select ts, notional = price * size)",
+      {"filter_project",
+       R"(trades | filter price > 100 and size < 500 | select ts, notional = price * size)",
        [](const hw::In& in, void* const* o, hw::Scratch&) { return hw::filter_project(in, o); }},
       {"window", R"(trades | window 5m sum(size), mean(price), min(price), max(price))",
        [](const hw::In& in, void* const* o, hw::Scratch& s) { return hw::window(in, o, s); }},
       {"asof", R"(trades | asof_join quotes on sym)",
        [](const hw::In& in, void* const* o, hw::Scratch& s) { return hw::asof(in, o, s); }},
-      {"combined", R"(trades | filter price > 100 and sym == "AAPL" | window 5m mean(price) | asof_join quotes on sym)",
+      {"combined",
+       R"(trades | filter price > 100 and sym == "AAPL" | window 5m mean(price) | asof_join quotes on sym)",
        [](const hw::In& in, void* const* o, hw::Scratch& s) { return hw::combined(in, o, s); }},
-      {"combined/&", R"(trades | filter price > 100 and sym == "AAPL" | window 5m mean(price) | asof_join quotes on sym)",
-       [](const hw::In& in, void* const* o, hw::Scratch& s) { return hw::combined_bitand(in, o, s); }},
+      {"combined/&",
+       R"(trades | filter price > 100 and sym == "AAPL" | window 5m mean(price) | asof_join quotes on sym)",
+       [](const hw::In& in, void* const* o, hw::Scratch& s) {
+         return hw::combined_bitand(in, o, s);
+       }},
   };
 
-  std::printf("# tsq benchmark: rows=%lld reps=%d window_direct_input=%d window_output_history=%d mode=%s\n",
-              (long long)rows, reps, int(copts.window_direct_input), int(copts.window_output_history),
-              interp_only ? "interp-only" : run_interp ? "all" : "native-only");
+  std::printf("# tsq benchmark: rows=%lld reps=%d window_direct_input=%d window_output_history=%d "
+              "mode=%s\n",
+              (long long)rows, reps, int(copts.window_direct_input),
+              int(copts.window_output_history),
+              interp_only  ? "interp-only"
+              : run_interp ? "all"
+                           : "native-only");
   auto selected = [&](const std::string& name) {
     return only.empty() || ("," + only + ",").find("," + name + ",") != std::string::npos;
   };
@@ -143,19 +163,30 @@ int main(int argc, char** argv) {
   std::printf("# generated trades+quotes in %.0f ms\n", ms(t0, Clock::now()));
   NamedTables tables{{"trades", named(trades)}, {"quotes", named(quotes)}};
 
-  hw::In hin{trades.col<int64_t>("ts"), trades.col<int32_t>("sym"), trades.col<double>("price"),
-             trades.col<int64_t>("size"), rows, quotes.col<int64_t>("ts"), quotes.col<int32_t>("sym"),
-             quotes.col<double>("bid"), quotes.col<double>("ask"), quotes.rows, 0, int64_t(symbols.size())};
+  hw::In hin{trades.col<int64_t>("ts"),
+             trades.col<int32_t>("sym"),
+             trades.col<double>("price"),
+             trades.col<int64_t>("size"),
+             rows,
+             quotes.col<int64_t>("ts"),
+             quotes.col<int32_t>("sym"),
+             quotes.col<double>("bid"),
+             quotes.col<double>("ask"),
+             quotes.rows,
+             0,
+             int64_t(symbols.size())};
   hw::Scratch hscratch;
 
   Catalog cat;
   cat.tables["trades"] = trades.schema;
   cat.tables["quotes"] = quotes.schema;
 
-  std::printf("# times in ms; med = median, min = minimum over reps; ratios use medians (and mins)\n");
-  std::printf("%-15s %10s %10s %9s %9s %9s %9s %9s %8s %8s %8s %8s %8s %8s %8s %8s %6s\n", "query", "out_rows",
-              "interp", "jit_med", "jit_min", "hand_med", "hand_min", "jit_cold", "int/jit", "jit/hand", "(min)",
-              "c_parse", "c_irgen", "c_opt", "c_mc", "c_total", "match");
+  std::printf(
+      "# times in ms; med = median, min = minimum over reps; ratios use medians (and mins)\n");
+  std::printf("%-15s %10s %10s %9s %9s %9s %9s %9s %8s %8s %8s %8s %8s %8s %8s %8s %6s\n", "query",
+              "out_rows", "interp", "jit_med", "jit_min", "hand_med", "hand_min", "jit_cold",
+              "int/jit", "jit/hand", "(min)", "c_parse", "c_irgen", "c_opt", "c_mc", "c_total",
+              "match");
   bool all_match = true;
   for (const auto& bq : queries) {
     if (!selected(bq.name)) continue;
@@ -205,13 +236,17 @@ int main(int argc, char** argv) {
       auto a = Clock::now();
       jrows = jq->run_raw(bi, outp.data());
       auto b = Clock::now();
-      if (r == 0) hj = hash_output(out_schema, outp.data(), jrows);
-      else tj.push_back(ms(a, b));
+      if (r == 0)
+        hj = hash_output(out_schema, outp.data(), jrows);
+      else
+        tj.push_back(ms(a, b));
       a = Clock::now();
       hrows = bq.hand(hin, outp.data(), hscratch);
       b = Clock::now();
-      if (r == 0) hh = hash_output(out_schema, outp.data(), hrows);
-      else th.push_back(ms(a, b));
+      if (r == 0)
+        hh = hash_output(out_schema, outp.data(), hrows);
+      else
+        th.push_back(ms(a, b));
     }
     outb.clear();
     outp.clear();
@@ -231,7 +266,8 @@ int main(int argc, char** argv) {
         ti.push_back(ms(a, b));
         if (r == 0) {
           std::vector<void*> p;
-          for (auto& c : res.cols) p.push_back(c.data.data());
+          for (auto& c : res.cols)
+            p.push_back(c.data.data());
           irows = res.rows;
           hi = hash_output(out_schema, p.data(), res.rows);
         }
@@ -241,23 +277,31 @@ int main(int argc, char** argv) {
     all_match &= match;
     if (interp_only) tj = th = {0.0};
     double mi = run_interp ? median(ti) : 0, mj = median(tj), mh = median(th);
-    double nj = *std::min_element(tj.begin(), tj.end()), nh = *std::min_element(th.begin(), th.end());
-    std::printf("%-15s %10lld %10.1f %9.1f %9.1f %9.1f %9.1f %9.1f %8.2f %8.3f %8.3f %8.3f %8.3f %8.2f %8.2f %8.2f %6s\n",
-                bq.name.c_str(), (long long)jrows, mi, mj, nj, mh, nh, tjc, run_interp ? mi / mj : 0.0,
-                mj / mh, nj / nh, median(cp), median(ci), median(co), median(cm), median(ct), match ? "yes" : "NO");
+    double nj = *std::min_element(tj.begin(), tj.end()),
+           nh = *std::min_element(th.begin(), th.end());
+    std::printf("%-15s %10lld %10.1f %9.1f %9.1f %9.1f %9.1f %9.1f %8.2f %8.3f %8.3f %8.3f %8.3f "
+                "%8.2f %8.2f %8.2f %6s\n",
+                bq.name.c_str(), (long long)jrows, mi, mj, nj, mh, nh, tjc,
+                run_interp ? mi / mj : 0.0, mj / mh, nj / nh, median(cp), median(ci), median(co),
+                median(cm), median(ct), match ? "yes" : "NO");
     std::ostringstream raw;
     raw << "#raw " << bq.name << " jit_ms=";
-    for (double v : tj) raw << v << ",";
+    for (double v : tj)
+      raw << v << ",";
     raw << " hand_ms=";
-    for (double v : th) raw << v << ",";
+    for (double v : th)
+      raw << v << ",";
     raw << " jit_cold_ms=" << tjc;
     raw << " interp_ms=";
-    for (double v : ti) raw << v << ",";
+    for (double v : ti)
+      raw << v << ",";
     raw << " compile_total_ms=";
-    for (double v : ct) raw << v << ",";
+    for (double v : ct)
+      raw << v << ",";
     std::printf("%s\n", raw.str().c_str());
     std::fflush(stdout);
   }
-  std::printf("# peak RSS %ld MB; all outputs match: %s\n", peak_rss_mb(), all_match ? "yes" : "NO");
+  std::printf("# peak RSS %ld MB; all outputs match: %s\n", peak_rss_mb(),
+              all_match ? "yes" : "NO");
   return all_match ? 0 : 1;
 }

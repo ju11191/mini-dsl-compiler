@@ -42,13 +42,22 @@ public:
     Relation r;
     const TableView& src = in_.tables[0];
     r.rows = src.rows;
-    for (const auto& c : src.cols) r.cols.push_back(RCol{c.type, c.data, nullptr});
+    for (const auto& c : src.cols)
+      r.cols.push_back(RCol{c.type, c.data, nullptr});
     for (const auto& st : q_.stages) {
       switch (st.kind) {
-      case BStage::Kind::Filter: r = filter(st, r); break;
-      case BStage::Kind::Project: r = project(st, r); break;
-      case BStage::Kind::Window: r = window(st, r); break;
-      case BStage::Kind::Asof: r = asof(st, r); break;
+      case BStage::Kind::Filter:
+        r = filter(st, r);
+        break;
+      case BStage::Kind::Project:
+        r = project(st, r);
+        break;
+      case BStage::Kind::Window:
+        r = window(st, r);
+        break;
+      case BStage::Kind::Asof:
+        r = asof(st, r);
+        break;
       }
     }
     // Hand over buffers the interpreter owns exclusively; copy the rest
@@ -79,33 +88,60 @@ private:
     case BExpr::Kind::Col: {
       const RCol& c = r.cols[e.col];
       switch (c.type) {
-      case Type::I64: v.i = static_cast<const int64_t*>(c.data)[row]; break;
-      case Type::F64: v.f = static_cast<const double*>(c.data)[row]; break;
-      case Type::Sym: v.i = static_cast<const int32_t*>(c.data)[row]; break;
-      case Type::Bool: v.b = false; break; // never stored
+      case Type::I64:
+        v.i = static_cast<const int64_t*>(c.data)[row];
+        break;
+      case Type::F64:
+        v.f = static_cast<const double*>(c.data)[row];
+        break;
+      case Type::Sym:
+        v.i = static_cast<const int32_t*>(c.data)[row];
+        break;
+      case Type::Bool:
+        v.b = false;
+        break; // never stored
       }
       return v;
     }
-    case BExpr::Kind::ConstI64: v.i = e.i; return v;
-    case BExpr::Kind::ConstF64: v.f = e.f; return v;
-    case BExpr::Kind::ConstBool: v.b = e.b; return v;
-    case BExpr::Kind::SymParam: v.i = in_.params[e.param]; return v;
-    case BExpr::Kind::CastF64: v.f = double(eval(*e.kids[0], r, row).i); return v;
+    case BExpr::Kind::ConstI64:
+      v.i = e.i;
+      return v;
+    case BExpr::Kind::ConstF64:
+      v.f = e.f;
+      return v;
+    case BExpr::Kind::ConstBool:
+      v.b = e.b;
+      return v;
+    case BExpr::Kind::SymParam:
+      v.i = in_.params[e.param];
+      return v;
+    case BExpr::Kind::CastF64:
+      v.f = double(eval(*e.kids[0], r, row).i);
+      return v;
     case BExpr::Kind::Neg: {
       Value x = eval(*e.kids[0], r, row);
-      if (e.type == Type::I64) v.i = sem::neg(x.i);
-      else v.f = -x.f;
+      if (e.type == Type::I64)
+        v.i = sem::neg(x.i);
+      else
+        v.f = -x.f;
       return v;
     }
-    case BExpr::Kind::Not: v.b = !eval(*e.kids[0], r, row).b; return v;
+    case BExpr::Kind::Not:
+      v.b = !eval(*e.kids[0], r, row).b;
+      return v;
     case BExpr::Kind::Abs: {
       Value x = eval(*e.kids[0], r, row);
-      if (e.type == Type::I64) v.i = sem::abs(x.i);
-      else v.f = std::fabs(x.f);
+      if (e.type == Type::I64)
+        v.i = sem::abs(x.i);
+      else
+        v.f = std::fabs(x.f);
       return v;
     }
-    case BExpr::Kind::Sqrt: v.f = std::sqrt(eval(*e.kids[0], r, row).f); return v;
-    case BExpr::Kind::Bin: return binary(e, r, row);
+    case BExpr::Kind::Sqrt:
+      v.f = std::sqrt(eval(*e.kids[0], r, row).f);
+      return v;
+    case BExpr::Kind::Bin:
+      return binary(e, r, row);
     }
     v.i = 0;
     return v;
@@ -128,26 +164,47 @@ private:
     Type t = e.kids[0]->type; // operand type (both sides identical after binding)
     switch (e.op) {
     case BinOp::Add:
-      if (t == Type::I64) v.i = sem::add(a.i, b.i);
-      else v.f = a.f + b.f;
+      if (t == Type::I64)
+        v.i = sem::add(a.i, b.i);
+      else
+        v.f = a.f + b.f;
       return v;
     case BinOp::Sub:
-      if (t == Type::I64) v.i = sem::sub(a.i, b.i);
-      else v.f = a.f - b.f;
+      if (t == Type::I64)
+        v.i = sem::sub(a.i, b.i);
+      else
+        v.f = a.f - b.f;
       return v;
     case BinOp::Mul:
-      if (t == Type::I64) v.i = sem::mul(a.i, b.i);
-      else v.f = a.f * b.f;
+      if (t == Type::I64)
+        v.i = sem::mul(a.i, b.i);
+      else
+        v.f = a.f * b.f;
       return v;
-    case BinOp::Div: v.f = a.f / b.f; return v;
-    case BinOp::Eq: v.b = t == Type::F64 ? a.f == b.f : t == Type::Bool ? a.b == b.b : a.i == b.i; return v;
-    case BinOp::Ne: v.b = t == Type::F64 ? a.f != b.f : t == Type::Bool ? a.b != b.b : a.i != b.i; return v;
-    case BinOp::Lt: v.b = t == Type::F64 ? a.f < b.f : a.i < b.i; return v;
-    case BinOp::Le: v.b = t == Type::F64 ? a.f <= b.f : a.i <= b.i; return v;
-    case BinOp::Gt: v.b = t == Type::F64 ? a.f > b.f : a.i > b.i; return v;
-    case BinOp::Ge: v.b = t == Type::F64 ? a.f >= b.f : a.i >= b.i; return v;
+    case BinOp::Div:
+      v.f = a.f / b.f;
+      return v;
+    case BinOp::Eq:
+      v.b = t == Type::F64 ? a.f == b.f : t == Type::Bool ? a.b == b.b : a.i == b.i;
+      return v;
+    case BinOp::Ne:
+      v.b = t == Type::F64 ? a.f != b.f : t == Type::Bool ? a.b != b.b : a.i != b.i;
+      return v;
+    case BinOp::Lt:
+      v.b = t == Type::F64 ? a.f < b.f : a.i < b.i;
+      return v;
+    case BinOp::Le:
+      v.b = t == Type::F64 ? a.f <= b.f : a.i <= b.i;
+      return v;
+    case BinOp::Gt:
+      v.b = t == Type::F64 ? a.f > b.f : a.i > b.i;
+      return v;
+    case BinOp::Ge:
+      v.b = t == Type::F64 ? a.f >= b.f : a.i >= b.i;
+      return v;
     case BinOp::And:
-    case BinOp::Or: break; // handled above
+    case BinOp::Or:
+      break; // handled above
     }
     v.i = 0;
     return v;
@@ -155,10 +212,17 @@ private:
 
   static void store(RCol& c, int64_t row, Value v) {
     switch (c.type) {
-    case Type::I64: static_cast<int64_t*>(const_cast<void*>(c.data))[row] = v.i; break;
-    case Type::F64: static_cast<double*>(const_cast<void*>(c.data))[row] = v.f; break;
-    case Type::Sym: static_cast<int32_t*>(const_cast<void*>(c.data))[row] = int32_t(v.i); break;
-    case Type::Bool: break;
+    case Type::I64:
+      static_cast<int64_t*>(const_cast<void*>(c.data))[row] = v.i;
+      break;
+    case Type::F64:
+      static_cast<double*>(const_cast<void*>(c.data))[row] = v.f;
+      break;
+    case Type::Sym:
+      static_cast<int32_t*>(const_cast<void*>(c.data))[row] = int32_t(v.i);
+      break;
+    case Type::Bool:
+      break;
     }
   }
 
@@ -174,7 +238,8 @@ private:
       size_t w = type_size(c.type);
       auto* dst = static_cast<std::byte*>(const_cast<void*>(nc.data));
       auto* src = static_cast<const std::byte*>(c.data);
-      for (size_t k = 0; k < sel.size(); ++k) std::memcpy(dst + k * w, src + size_t(sel[k]) * w, w);
+      for (size_t k = 0; k < sel.size(); ++k)
+        std::memcpy(dst + k * w, src + size_t(sel[k]) * w, w);
       out.cols.push_back(std::move(nc));
     }
     return out;
@@ -189,7 +254,8 @@ private:
         continue;
       }
       RCol nc = new_col(e->type, r.rows);
-      for (int64_t i = 0; i < r.rows; ++i) store(nc, i, eval(*e, r, i));
+      for (int64_t i = 0; i < r.rows; ++i)
+        store(nc, i, eval(*e, r, i));
       out.cols.push_back(std::move(nc));
     }
     return out;
@@ -203,16 +269,22 @@ private:
     const auto* ts = static_cast<const int64_t*>(r.cols[st.ts_col].data);
     size_t na = st.aggs.size();
     std::vector<RCol> outc;
-    for (const auto& a : st.aggs) outc.push_back(new_col(a.out_type, n));
+    for (const auto& a : st.aggs)
+      outc.push_back(new_col(a.out_type, n));
     std::vector<int64_t> isum(na, 0);
     std::vector<double> fsum(na, 0.0);
     std::vector<std::vector<int64_t>> dq(na);
     std::vector<int64_t> head(na, 0), tail(na, 0);
     for (size_t a = 0; a < na; ++a)
-      if (st.aggs[a].fn == AggFn::Min || st.aggs[a].fn == AggFn::Max) dq[a].resize(size_t(std::max<int64_t>(n, 1)));
+      if (st.aggs[a].fn == AggFn::Min || st.aggs[a].fn == AggFn::Max)
+        dq[a].resize(size_t(std::max<int64_t>(n, 1)));
 
-    auto xi = [&](size_t a, int64_t k) { return static_cast<const int64_t*>(r.cols[st.aggs[a].col].data)[k]; };
-    auto xf = [&](size_t a, int64_t k) { return static_cast<const double*>(r.cols[st.aggs[a].col].data)[k]; };
+    auto xi = [&](size_t a, int64_t k) {
+      return static_cast<const int64_t*>(r.cols[st.aggs[a].col].data)[k];
+    };
+    auto xf = [&](size_t a, int64_t k) {
+      return static_cast<const double*>(r.cols[st.aggs[a].col].data)[k];
+    };
 
     int64_t start = 0;
     for (int64_t k = 0; k < n; ++k) {
@@ -222,8 +294,10 @@ private:
         for (size_t a = 0; a < na; ++a) {
           const BAgg& g = st.aggs[a];
           if (g.fn == AggFn::Sum || g.fn == AggFn::Mean) {
-            if (g.in_type == Type::I64) isum[a] = sem::sub(isum[a], xi(a, start));
-            else fsum[a] = fsum[a] - xf(a, start);
+            if (g.in_type == Type::I64)
+              isum[a] = sem::sub(isum[a], xi(a, start));
+            else
+              fsum[a] = fsum[a] - xf(a, start);
           }
         }
         ++start;
@@ -234,7 +308,9 @@ private:
         const BAgg& g = st.aggs[a];
         Value v;
         switch (g.fn) {
-        case AggFn::Count: v.i = count; break;
+        case AggFn::Count:
+          v.i = count;
+          break;
         case AggFn::Sum:
         case AggFn::Mean:
           if (start == k) { // window was empty: reset to avoid FP drift
@@ -243,12 +319,16 @@ private:
           }
           if (g.in_type == Type::I64) {
             isum[a] = sem::add(isum[a], xi(a, k));
-            if (g.fn == AggFn::Sum) v.i = isum[a];
-            else v.f = double(isum[a]) / double(count);
+            if (g.fn == AggFn::Sum)
+              v.i = isum[a];
+            else
+              v.f = double(isum[a]) / double(count);
           } else {
             fsum[a] = fsum[a] + xf(a, k);
-            if (g.fn == AggFn::Sum) v.f = fsum[a];
-            else v.f = fsum[a] / double(count);
+            if (g.fn == AggFn::Sum)
+              v.f = fsum[a];
+            else
+              v.f = fsum[a] / double(count);
           }
           break;
         case AggFn::Min:
@@ -259,22 +339,28 @@ private:
           int64_t& t = tail[a];
           if (g.in_type == Type::I64) {
             int64_t x = xi(a, k);
-            while (t > h && (is_min ? xi(a, d[t - 1]) >= x : xi(a, d[t - 1]) <= x)) --t;
+            while (t > h && (is_min ? xi(a, d[t - 1]) >= x : xi(a, d[t - 1]) <= x))
+              --t;
           } else {
             double x = xf(a, k);
-            while (t > h && (is_min ? xf(a, d[t - 1]) >= x : xf(a, d[t - 1]) <= x)) --t;
+            while (t > h && (is_min ? xf(a, d[t - 1]) >= x : xf(a, d[t - 1]) <= x))
+              --t;
           }
           d[t++] = k;
-          while (d[h] < start) ++h;
-          if (g.in_type == Type::I64) v.i = xi(a, d[h]);
-          else v.f = xf(a, d[h]);
+          while (d[h] < start)
+            ++h;
+          if (g.in_type == Type::I64)
+            v.i = xi(a, d[h]);
+          else
+            v.f = xf(a, d[h]);
           break;
         }
         }
         store(outc[a], k, v);
       }
     }
-    for (auto& c : outc) out.cols.push_back(std::move(c));
+    for (auto& c : outc)
+      out.cols.push_back(std::move(c));
     return out;
   }
 
@@ -289,7 +375,8 @@ private:
     const auto* rkey = static_cast<const int32_t*>(rt.cols[st.right_key].data);
     std::vector<int64_t> last(size_t(std::max<int64_t>(nsym, 1)), -1);
     std::vector<RCol> outc;
-    for (size_t p = 0; p < st.payload.size(); ++p) outc.push_back(new_col(Type::F64, n));
+    for (size_t p = 0; p < st.payload.size(); ++p)
+      outc.push_back(new_col(Type::F64, n));
     int64_t rp = 0;
     for (int64_t i = 0; i < n; ++i) {
       const int64_t t = lts[i];
@@ -305,18 +392,22 @@ private:
         double v = std::numeric_limits<double>::quiet_NaN();
         if (j >= 0) {
           const void* d = rt.cols[pl.right_col].data;
-          v = pl.in_type == Type::F64 ? static_cast<const double*>(d)[j] : double(static_cast<const int64_t*>(d)[j]);
+          v = pl.in_type == Type::F64 ? static_cast<const double*>(d)[j]
+                                      : double(static_cast<const int64_t*>(d)[j]);
         }
         static_cast<double*>(const_cast<void*>(outc[p].data))[i] = v;
       }
     }
-    for (auto& c : outc) out.cols.push_back(std::move(c));
+    for (auto& c : outc)
+      out.cols.push_back(std::move(c));
     return out;
   }
 };
 
 } // namespace
 
-Result interpret(const BoundQuery& q, const BoundInputs& in) { return Interp(q, in).run(); }
+Result interpret(const BoundQuery& q, const BoundInputs& in) {
+  return Interp(q, in).run();
+}
 
 } // namespace tsq

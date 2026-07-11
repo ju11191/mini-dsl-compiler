@@ -85,7 +85,8 @@ struct OwnedTable {
 
   OwnedTable() = default;
   OwnedTable(Schema s, int64_t n) : schema(std::move(s)), rows(n) {
-    for (const auto& c : schema) cols.emplace_back(size_t(n) * type_size(c.type));
+    for (const auto& c : schema)
+      cols.emplace_back(size_t(n) * type_size(c.type));
   }
   template <class T> T* col(const std::string& name) {
     int i = find_column(schema, name);
@@ -95,7 +96,8 @@ struct OwnedTable {
   TableView view() const {
     TableView v;
     v.rows = rows;
-    for (size_t i = 0; i < schema.size(); ++i) v.cols.push_back(ColumnView{schema[i].type, cols[i].data()});
+    for (size_t i = 0; i < schema.size(); ++i)
+      v.cols.push_back(ColumnView{schema[i].type, cols[i].data()});
     return v;
   }
 };

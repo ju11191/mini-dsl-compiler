@@ -5,8 +5,8 @@
 #include "binder.h"
 #include "runtime.h"
 
-#include <llvm/IR/LLVMContext.h>
 #include <llvm/IR/DataLayout.h>
+#include <llvm/IR/LLVMContext.h>
 #include <llvm/IR/Module.h>
 #include <llvm/TargetParser/Triple.h>
 
@@ -36,6 +36,7 @@ inline constexpr const char* kQueryFnName = "tsq_query";
 // `dl`/`triple`, if given, are set on the module before IR is built so loads and
 // stores get the target's natural alignment.
 GeneratedModule generate_ir(const BoundQuery& q, const CodegenOptions& opts = {},
-                            const llvm::DataLayout* dl = nullptr, const llvm::Triple* triple = nullptr);
+                            const llvm::DataLayout* dl = nullptr,
+                            const llvm::Triple* triple = nullptr);
 
 } // namespace tsq

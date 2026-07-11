@@ -62,13 +62,15 @@ public:
           throw py::key_error("table '" + bt.name + "' is missing column '" + cd.name + "'");
         py::array a = py::array::ensure(cols[py::str(cd.name)], py::array::c_style);
         if (!a) throw py::type_error("column '" + bt.name + "." + cd.name + "' is not array-like");
-        if (a.ndim() != 1) throw py::value_error("column '" + bt.name + "." + cd.name + "' must be 1-D");
+        if (a.ndim() != 1)
+          throw py::value_error("column '" + bt.name + "." + cd.name + "' must be 1-D");
         Type ty = dtype_type(a, bt.name + "." + cd.name);
         int64_t n = int64_t(a.shape(0));
-        if (first) t.rows = n;
+        if (first)
+          t.rows = n;
         else if (n != t.rows)
-          throw py::value_error("table '" + bt.name + "': column '" + cd.name + "' has " + std::to_string(n) +
-                                " rows, expected " + std::to_string(t.rows));
+          throw py::value_error("table '" + bt.name + "': column '" + cd.name + "' has " +
+                                std::to_string(n) + " rows, expected " + std::to_string(t.rows));
         first = false;
         t.cols[cd.name] = ColumnView{ty, a.data()};
         keep.push_back(std::move(a));
@@ -86,7 +88,7 @@ public:
       size_t w = type_size(c.type);
       std::byte* p = c.data.release(); // ownership moves to the numpy array
       py::capsule owner(p, [](void* q) { std::free(q); });
-      py::dtype dt = c.type == Type::I64 ? py::dtype::of<int64_t>()
+      py::dtype dt = c.type == Type::I64   ? py::dtype::of<int64_t>()
                      : c.type == Type::F64 ? py::dtype::of<double>()
                                            : py::dtype::of<int32_t>();
       out[py::str(c.name)] = py::array(dt, {r.rows}, {ssize_t(w)}, p, owner);
@@ -94,7 +96,9 @@ public:
     return out;
   }
 
-  std::string ir(bool optimized) const { return optimized ? q_->ir_optimized() : q_->ir_unoptimized(); }
+  std::string ir(bool optimized) const {
+    return optimized ? q_->ir_optimized() : q_->ir_unoptimized();
+  }
 
   py::dict stats() const {
     const auto& s = q_->stats();
@@ -109,13 +113,15 @@ public:
 
   std::vector<std::pair<std::string, std::string>> output_schema() const {
     std::vector<std::pair<std::string, std::string>> v;
-    for (const auto& c : q_->plan().output) v.emplace_back(c.name, type_name(c.type));
+    for (const auto& c : q_->plan().output)
+      v.emplace_back(c.name, type_name(c.type));
     return v;
   }
 
   std::vector<std::string> tables() const {
     std::vector<std::string> v;
-    for (const auto& t : q_->plan().tables) v.push_back(t.name);
+    for (const auto& t : q_->plan().tables)
+      v.push_back(t.name);
     return v;
   }
 
@@ -144,11 +150,14 @@ PYBIND11_MODULE(_core, m) {
 
   m.def(
       "compile",
-      [](const std::string& text, const std::map<std::string, std::vector<std::pair<std::string, std::string>>>& schema,
-         const std::string& backend, int opt_level, bool window_direct_input, bool window_output_history) {
+      [](const std::string& text,
+         const std::map<std::string, std::vector<std::pair<std::string, std::string>>>& schema,
+         const std::string& backend, int opt_level, bool window_direct_input,
+         bool window_output_history) {
         Catalog cat;
         for (const auto& [tname, cols] : schema)
-          for (const auto& [cname, ty] : cols) cat.tables[tname].push_back(ColumnDef{cname, parse_type(ty)});
+          for (const auto& [cname, ty] : cols)
+            cat.tables[tname].push_back(ColumnDef{cname, parse_type(ty)});
         if (backend != "jit" && backend != "interp")
           throw py::value_error("backend must be 'jit' or 'interp'");
         CompileOptions opts;
@@ -156,7 +165,8 @@ PYBIND11_MODULE(_core, m) {
         opts.window_direct_input = window_direct_input;
         opts.window_output_history = window_output_history;
         try {
-          return PyQuery(CompiledQuery::compile(text, cat, backend == "jit" ? Backend::Jit : Backend::Interp, opts));
+          return PyQuery(CompiledQuery::compile(
+              text, cat, backend == "jit" ? Backend::Jit : Backend::Interp, opts));
         } catch (const CompileError& e) {
           raise_compile_error(e, text);
         }

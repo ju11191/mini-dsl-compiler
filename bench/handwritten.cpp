@@ -116,12 +116,16 @@ int64_t window(const In& in, void* const* out, Scratch& s) {
     const double x = px[k];
     isum += sz[k];
     fsum = fsum + x;
-    while (tmin > hmin && px[dmin[tmin - 1]] >= x) --tmin;
+    while (tmin > hmin && px[dmin[tmin - 1]] >= x)
+      --tmin;
     dmin[tmin++] = k;
-    while (dmin[hmin] < start) ++hmin;
-    while (tmax > hmax && px[dmax[tmax - 1]] <= x) --tmax;
+    while (dmin[hmin] < start)
+      ++hmin;
+    while (tmax > hmax && px[dmax[tmax - 1]] <= x)
+      --tmax;
     dmax[tmax++] = k;
-    while (dmax[hmax] < start) ++hmax;
+    while (dmax[hmax] < start)
+      ++hmax;
     ots[k] = ts[k];
     osym[k] = in.sym[k];
     opx[k] = x;
@@ -175,7 +179,8 @@ template <bool BitAnd> int64_t combined_impl(const In& in, void* const* out, Scr
   int64_t rp = 0, o = 0, start = 0;
   double fsum = 0.0;
   for (int64_t i = 0; i < in.n; ++i) {
-    bool pass = BitAnd ? ((in.price[i] > 100.0) & (in.sym[i] == in.aapl)) : (in.price[i] > 100.0 && in.sym[i] == in.aapl);
+    bool pass = BitAnd ? ((in.price[i] > 100.0) & (in.sym[i] == in.aapl))
+                       : (in.price[i] > 100.0 && in.sym[i] == in.aapl);
     if (!pass) continue;
     const int64_t t = in.ts[i];
     const double x = in.price[i];
@@ -206,7 +211,11 @@ template <bool BitAnd> int64_t combined_impl(const In& in, void* const* out, Scr
 }
 } // namespace
 
-int64_t combined(const In& in, void* const* out, Scratch& s) { return combined_impl<false>(in, out, s); }
-int64_t combined_bitand(const In& in, void* const* out, Scratch& s) { return combined_impl<true>(in, out, s); }
+int64_t combined(const In& in, void* const* out, Scratch& s) {
+  return combined_impl<false>(in, out, s);
+}
+int64_t combined_bitand(const In& in, void* const* out, Scratch& s) {
+  return combined_impl<true>(in, out, s);
+}
 
 } // namespace hw

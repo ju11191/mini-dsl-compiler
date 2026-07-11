@@ -24,7 +24,9 @@ namespace tsq {
 namespace {
 
 using Clock = std::chrono::steady_clock;
-double ms_since(Clock::time_point t0) { return std::chrono::duration<double, std::milli>(Clock::now() - t0).count(); }
+double ms_since(Clock::time_point t0) {
+  return std::chrono::duration<double, std::milli>(Clock::now() - t0).count();
+}
 
 void init_llvm_once() {
   static std::once_flag flag;
@@ -73,7 +75,7 @@ void optimize(llvm::Module& m, llvm::TargetMachine* tm, int level) {
   pb.registerFunctionAnalyses(fam);
   pb.registerLoopAnalyses(lam);
   pb.crossRegisterProxies(lam, fam, cgam, mam);
-  llvm::OptimizationLevel ol = level == 1 ? llvm::OptimizationLevel::O1
+  llvm::OptimizationLevel ol = level == 1   ? llvm::OptimizationLevel::O1
                                : level == 3 ? llvm::OptimizationLevel::O3
                                             : llvm::OptimizationLevel::O2;
   llvm::ModulePassManager mpm = pb.buildPerModuleDefaultPipeline(ol);
@@ -82,8 +84,8 @@ void optimize(llvm::Module& m, llvm::TargetMachine* tm, int level) {
 
 class JitExecutable : public Executable {
 public:
-  JitExecutable(const BoundQuery& q, const CompileOptions& opts, CompileStats& stats, std::string& ir_unopt,
-                std::string& ir_opt)
+  JitExecutable(const BoundQuery& q, const CompileOptions& opts, CompileStats& stats,
+                std::string& ir_unopt, std::string& ir_opt)
       : q_(q) {
     init_llvm_once();
     auto jtmb = check(llvm::orc::JITTargetMachineBuilder::detectHost(), "detect host");
@@ -106,8 +108,10 @@ public:
     if (opts.keep_ir) ir_opt = module_text(*gm.module);
 
     t0 = Clock::now();
-    jit_ = check(llvm::orc::LLJITBuilder().setJITTargetMachineBuilder(std::move(jtmb)).create(), "create LLJIT");
-    check(jit_->addIRModule(llvm::orc::ThreadSafeModule(std::move(gm.module), std::move(gm.ctx))), "add module");
+    jit_ = check(llvm::orc::LLJITBuilder().setJITTargetMachineBuilder(std::move(jtmb)).create(),
+                 "create LLJIT");
+    check(jit_->addIRModule(llvm::orc::ThreadSafeModule(std::move(gm.module), std::move(gm.ctx))),
+          "add module");
     auto sym = check(jit_->lookup(kQueryFnName), "lookup");
     fn_ = sym.toPtr<QueryFn>();
     stats.codegen_ms = ms_since(t0);
@@ -118,7 +122,8 @@ public:
     flat_inputs_.clear();
     lens_.clear();
     for (const auto& t : in.tables) {
-      for (const auto& c : t.cols) flat_inputs_.push_back(c.data);
+      for (const auto& c : t.cols)
+        flat_inputs_.push_back(c.data);
       lens_.push_back(t.rows);
     }
     params_ = in.params;
@@ -143,7 +148,8 @@ public:
     Result r;
     std::vector<void*> outs;
     for (const auto& c : q_.output) {
-      r.cols.push_back(Column{c.name, c.type, Buffer(size_t(std::max<int64_t>(n, 1)) * type_size(c.type))});
+      r.cols.push_back(
+          Column{c.name, c.type, Buffer(size_t(std::max<int64_t>(n, 1)) * type_size(c.type))});
       outs.push_back(r.cols.back().data.data());
     }
     r.rows = run_raw(in, outs.data());
@@ -165,8 +171,9 @@ private:
 
 } // namespace
 
-std::unique_ptr<Executable> make_jit_executable(const BoundQuery& q, const CompileOptions& opts, CompileStats& stats,
-                                                std::string& ir_unopt, std::string& ir_opt) {
+std::unique_ptr<Executable> make_jit_executable(const BoundQuery& q, const CompileOptions& opts,
+                                                CompileStats& stats, std::string& ir_unopt,
+                                                std::string& ir_opt) {
   return std::make_unique<JitExecutable>(q, opts, stats, ir_unopt, ir_opt);
 }
 

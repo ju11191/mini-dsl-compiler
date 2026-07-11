@@ -20,7 +20,7 @@ using ExprPtr = std::unique_ptr<Expr>;
 struct Expr {
   enum class Kind { IntLit, FloatLit, StrLit, BoolLit, DurLit, Column, Unary, Binary, Call };
   Kind kind;
-  SourceLoc loc; // spans the whole expression
+  SourceLoc loc;     // spans the whole expression
   int64_t ival = 0;  // IntLit, DurLit (ns)
   double fval = 0;   // FloatLit
   bool bval = false; // BoolLit
@@ -37,8 +37,8 @@ const char* aggfn_str(AggFn f);
 
 struct Agg {
   AggFn fn;
-  SourceLoc loc;     // the whole `fn(col) [as name]`
-  std::string col;   // empty for count()
+  SourceLoc loc;   // the whole `fn(col) [as name]`
+  std::string col; // empty for count()
   SourceLoc col_loc;
   std::string alias; // empty if none
   SourceLoc alias_loc;
@@ -54,13 +54,13 @@ struct Assignment {
 struct Stage {
   enum class Kind { Filter, Select, Derive, Window, AsofJoin };
   Kind kind;
-  SourceLoc loc; // the stage keyword
+  SourceLoc loc;                 // the stage keyword
   ExprPtr pred;                  // Filter
   std::vector<Assignment> items; // Select, Derive
   int64_t dur_ns = 0;            // Window
   SourceLoc dur_loc;
-  std::vector<Agg> aggs;         // Window
-  std::string table;             // AsofJoin
+  std::vector<Agg> aggs; // Window
+  std::string table;     // AsofJoin
   SourceLoc table_loc;
   std::string key;
   SourceLoc key_loc;

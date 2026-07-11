@@ -9,32 +9,58 @@ namespace tsq {
 
 const char* tok_name(Tok t) {
   switch (t) {
-  case Tok::Eof: return "end of query";
-  case Tok::Ident: return "identifier";
-  case Tok::Int: return "integer";
-  case Tok::Float: return "number";
-  case Tok::String: return "string";
-  case Tok::Duration: return "duration";
-  case Tok::Pipe: return "'|'";
-  case Tok::Comma: return "','";
-  case Tok::LParen: return "'('";
-  case Tok::RParen: return "')'";
-  case Tok::Assign: return "'='";
-  case Tok::EqEq: return "'=='";
-  case Tok::NotEq: return "'!='";
-  case Tok::Lt: return "'<'";
-  case Tok::Le: return "'<='";
-  case Tok::Gt: return "'>'";
-  case Tok::Ge: return "'>='";
-  case Tok::Plus: return "'+'";
-  case Tok::Minus: return "'-'";
-  case Tok::Star: return "'*'";
-  case Tok::Slash: return "'/'";
-  case Tok::KwAnd: return "'and'";
-  case Tok::KwOr: return "'or'";
-  case Tok::KwNot: return "'not'";
-  case Tok::KwTrue: return "'true'";
-  case Tok::KwFalse: return "'false'";
+  case Tok::Eof:
+    return "end of query";
+  case Tok::Ident:
+    return "identifier";
+  case Tok::Int:
+    return "integer";
+  case Tok::Float:
+    return "number";
+  case Tok::String:
+    return "string";
+  case Tok::Duration:
+    return "duration";
+  case Tok::Pipe:
+    return "'|'";
+  case Tok::Comma:
+    return "','";
+  case Tok::LParen:
+    return "'('";
+  case Tok::RParen:
+    return "')'";
+  case Tok::Assign:
+    return "'='";
+  case Tok::EqEq:
+    return "'=='";
+  case Tok::NotEq:
+    return "'!='";
+  case Tok::Lt:
+    return "'<'";
+  case Tok::Le:
+    return "'<='";
+  case Tok::Gt:
+    return "'>'";
+  case Tok::Ge:
+    return "'>='";
+  case Tok::Plus:
+    return "'+'";
+  case Tok::Minus:
+    return "'-'";
+  case Tok::Star:
+    return "'*'";
+  case Tok::Slash:
+    return "'/'";
+  case Tok::KwAnd:
+    return "'and'";
+  case Tok::KwOr:
+    return "'or'";
+  case Tok::KwNot:
+    return "'not'";
+  case Tok::KwTrue:
+    return "'true'";
+  case Tok::KwFalse:
+    return "'false'";
   }
   return "?";
 }
@@ -79,11 +105,13 @@ struct Lexer {
   Token number(SourceLoc start) {
     size_t b = pos;
     bool is_float = false;
-    while (std::isdigit((unsigned char)peek())) advance();
+    while (std::isdigit((unsigned char)peek()))
+      advance();
     if (peek() == '.' && std::isdigit((unsigned char)peek(1))) {
       is_float = true;
       advance();
-      while (std::isdigit((unsigned char)peek())) advance();
+      while (std::isdigit((unsigned char)peek()))
+        advance();
     }
     if ((peek() == 'e' || peek() == 'E') &&
         (std::isdigit((unsigned char)peek(1)) ||
@@ -91,7 +119,8 @@ struct Lexer {
       is_float = true;
       advance();
       if (peek() == '+' || peek() == '-') advance();
-      while (std::isdigit((unsigned char)peek())) advance();
+      while (std::isdigit((unsigned char)peek()))
+        advance();
     }
     std::string text(src.substr(b, pos - b));
     Token t;
@@ -99,12 +128,14 @@ struct Lexer {
     // A unit suffix directly after an integer makes a duration: 5m, 100ms.
     if (ident_start(peek())) {
       size_t ub = pos;
-      while (ident_char(peek())) advance();
+      while (ident_char(peek()))
+        advance();
       std::string_view unit = src.substr(ub, pos - ub);
       start.len = uint32_t(pos - start.offset);
       int64_t mult = unit_ns(unit);
       if (mult == 0)
-        fail("unknown duration unit '" + std::string(unit) + "' (expected ns, us, ms, s, m, h, d)", start);
+        fail("unknown duration unit '" + std::string(unit) + "' (expected ns, us, ms, s, m, h, d)",
+             start);
       if (is_float) fail("durations must be whole numbers, e.g. 1500ms instead of 1.5s", start);
       int64_t v = 0;
       auto r = std::from_chars(text.data(), text.data() + text.size(), v);
@@ -176,7 +207,8 @@ struct Lexer {
       if (c == ' ' || c == '\t' || c == '\n' || c == '\r') {
         advance();
       } else if (c == '#') {
-        while (!eof() && peek() != '\n') advance();
+        while (!eof() && peek() != '\n')
+          advance();
       } else {
         break;
       }
@@ -193,15 +225,22 @@ struct Lexer {
     if (c == '"') return string(start);
     if (ident_start(c)) {
       size_t b = pos;
-      while (ident_char(peek())) advance();
+      while (ident_char(peek()))
+        advance();
       t.text = std::string(src.substr(b, pos - b));
       t.loc.len = uint32_t(pos - b);
-      if (t.text == "and") t.kind = Tok::KwAnd;
-      else if (t.text == "or") t.kind = Tok::KwOr;
-      else if (t.text == "not") t.kind = Tok::KwNot;
-      else if (t.text == "true") t.kind = Tok::KwTrue;
-      else if (t.text == "false") t.kind = Tok::KwFalse;
-      else t.kind = Tok::Ident;
+      if (t.text == "and")
+        t.kind = Tok::KwAnd;
+      else if (t.text == "or")
+        t.kind = Tok::KwOr;
+      else if (t.text == "not")
+        t.kind = Tok::KwNot;
+      else if (t.text == "true")
+        t.kind = Tok::KwTrue;
+      else if (t.text == "false")
+        t.kind = Tok::KwFalse;
+      else
+        t.kind = Tok::Ident;
       return t;
     }
     auto one = [&](Tok k) {
@@ -217,25 +256,39 @@ struct Lexer {
       return t;
     };
     switch (c) {
-    case '|': return one(Tok::Pipe);
-    case ',': return one(Tok::Comma);
-    case '(': return one(Tok::LParen);
-    case ')': return one(Tok::RParen);
-    case '+': return one(Tok::Plus);
-    case '-': return one(Tok::Minus);
-    case '*': return one(Tok::Star);
-    case '/': return one(Tok::Slash);
-    case '=': return peek(1) == '=' ? two(Tok::EqEq) : one(Tok::Assign);
+    case '|':
+      return one(Tok::Pipe);
+    case ',':
+      return one(Tok::Comma);
+    case '(':
+      return one(Tok::LParen);
+    case ')':
+      return one(Tok::RParen);
+    case '+':
+      return one(Tok::Plus);
+    case '-':
+      return one(Tok::Minus);
+    case '*':
+      return one(Tok::Star);
+    case '/':
+      return one(Tok::Slash);
+    case '=':
+      return peek(1) == '=' ? two(Tok::EqEq) : one(Tok::Assign);
     case '!':
       if (peek(1) == '=') return two(Tok::NotEq);
       fail("unexpected '!' (use 'not' for negation, '!=' for inequality)", start);
-    case '<': return peek(1) == '=' ? two(Tok::Le) : one(Tok::Lt);
-    case '>': return peek(1) == '=' ? two(Tok::Ge) : one(Tok::Gt);
+    case '<':
+      return peek(1) == '=' ? two(Tok::Le) : one(Tok::Lt);
+    case '>':
+      return peek(1) == '=' ? two(Tok::Ge) : one(Tok::Gt);
     case '&':
       fail("unexpected '&' (use 'and')", start);
-    default: break;
+    default:
+      break;
     }
-    std::string shown = std::isprint((unsigned char)c) ? std::string(1, c) : "\\x" + std::to_string(int((unsigned char)c));
+    std::string shown = std::isprint((unsigned char)c)
+                            ? std::string(1, c)
+                            : "\\x" + std::to_string(int((unsigned char)c));
     fail("unexpected character '" + shown + "'", start);
   }
 };

@@ -8,29 +8,46 @@ namespace tsq {
 
 const char* binop_str(BinOp op) {
   switch (op) {
-  case BinOp::Add: return "+";
-  case BinOp::Sub: return "-";
-  case BinOp::Mul: return "*";
-  case BinOp::Div: return "/";
-  case BinOp::Eq: return "==";
-  case BinOp::Ne: return "!=";
-  case BinOp::Lt: return "<";
-  case BinOp::Le: return "<=";
-  case BinOp::Gt: return ">";
-  case BinOp::Ge: return ">=";
-  case BinOp::And: return "and";
-  case BinOp::Or: return "or";
+  case BinOp::Add:
+    return "+";
+  case BinOp::Sub:
+    return "-";
+  case BinOp::Mul:
+    return "*";
+  case BinOp::Div:
+    return "/";
+  case BinOp::Eq:
+    return "==";
+  case BinOp::Ne:
+    return "!=";
+  case BinOp::Lt:
+    return "<";
+  case BinOp::Le:
+    return "<=";
+  case BinOp::Gt:
+    return ">";
+  case BinOp::Ge:
+    return ">=";
+  case BinOp::And:
+    return "and";
+  case BinOp::Or:
+    return "or";
   }
   return "?";
 }
 
 const char* aggfn_str(AggFn f) {
   switch (f) {
-  case AggFn::Sum: return "sum";
-  case AggFn::Mean: return "mean";
-  case AggFn::Min: return "min";
-  case AggFn::Max: return "max";
-  case AggFn::Count: return "count";
+  case AggFn::Sum:
+    return "sum";
+  case AggFn::Mean:
+    return "mean";
+  case AggFn::Min:
+    return "min";
+  case AggFn::Max:
+    return "max";
+  case AggFn::Count:
+    return "count";
   }
   return "?";
 }
@@ -46,12 +63,16 @@ SourceLoc span(const SourceLoc& a, const SourceLoc& b) {
 
 std::string describe(const Token& t) {
   switch (t.kind) {
-  case Tok::Ident: return "identifier '" + t.text + "'";
+  case Tok::Ident:
+    return "identifier '" + t.text + "'";
   case Tok::Int:
   case Tok::Float:
-  case Tok::Duration: return "'" + t.text + "'";
-  case Tok::String: return "string \"" + t.text + "\"";
-  default: return tok_name(t.kind);
+  case Tok::Duration:
+    return "'" + t.text + "'";
+  case Tok::String:
+    return "string \"" + t.text + "\"";
+  default:
+    return tok_name(t.kind);
   }
 }
 
@@ -115,7 +136,8 @@ private:
   }
 
   Stage stage() {
-    if (!at(Tok::Ident)) fail("expected a stage name after '|', found " + describe(peek()), peek().loc);
+    if (!at(Tok::Ident))
+      fail("expected a stage name after '|', found " + describe(peek()), peek().loc);
     const Token& kw = next();
     Stage s;
     s.loc = kw.loc;
@@ -144,7 +166,8 @@ private:
       s.table = t.text;
       s.table_loc = t.loc;
       if (!(at(Tok::Ident) && peek().text == "on"))
-        fail("expected 'on <key>' after 'asof_join " + s.table + "', found " + describe(peek()), peek().loc);
+        fail("expected 'on <key>' after 'asof_join " + s.table + "', found " + describe(peek()),
+             peek().loc);
       next();
       const Token& k = expect(Tok::Ident, "a key column after 'on'");
       s.key = k.text;
@@ -158,7 +181,8 @@ private:
   }
 
   Assignment assignment(bool allow_bare) {
-    const Token& name = expect(Tok::Ident, allow_bare ? "a column name or 'name = expr'" : "'name = expr'");
+    const Token& name =
+        expect(Tok::Ident, allow_bare ? "a column name or 'name = expr'" : "'name = expr'");
     Assignment a;
     a.name = name.text;
     a.name_loc = name.loc;
@@ -177,11 +201,16 @@ private:
     const Token& fn = expect(Tok::Ident, "an aggregate such as mean(price)");
     Agg a;
     a.loc = fn.loc;
-    if (fn.text == "sum") a.fn = AggFn::Sum;
-    else if (fn.text == "mean" || fn.text == "avg") a.fn = AggFn::Mean;
-    else if (fn.text == "min") a.fn = AggFn::Min;
-    else if (fn.text == "max") a.fn = AggFn::Max;
-    else if (fn.text == "count") a.fn = AggFn::Count;
+    if (fn.text == "sum")
+      a.fn = AggFn::Sum;
+    else if (fn.text == "mean" || fn.text == "avg")
+      a.fn = AggFn::Mean;
+    else if (fn.text == "min")
+      a.fn = AggFn::Min;
+    else if (fn.text == "max")
+      a.fn = AggFn::Max;
+    else if (fn.text == "count")
+      a.fn = AggFn::Count;
     else
       fail("unknown aggregate '" + fn.text + "'" + suggest(fn.text, kAggs, 5) +
                "; aggregates are sum, mean, min, max, count",
@@ -192,7 +221,8 @@ private:
       a.col = c.text;
       a.col_loc = c.loc;
     } else if (a.fn != AggFn::Count) {
-      fail("expected a column name inside " + fn.text + "(...), found " + describe(peek()), peek().loc);
+      fail("expected a column name inside " + fn.text + "(...), found " + describe(peek()),
+           peek().loc);
     }
     const Token& rp = expect(Tok::RParen, "')'");
     a.loc = span(a.loc, rp.loc);
@@ -249,13 +279,26 @@ private:
 
   static bool cmp_op(Tok k, BinOp& op) {
     switch (k) {
-    case Tok::EqEq: op = BinOp::Eq; return true;
-    case Tok::NotEq: op = BinOp::Ne; return true;
-    case Tok::Lt: op = BinOp::Lt; return true;
-    case Tok::Le: op = BinOp::Le; return true;
-    case Tok::Gt: op = BinOp::Gt; return true;
-    case Tok::Ge: op = BinOp::Ge; return true;
-    default: return false;
+    case Tok::EqEq:
+      op = BinOp::Eq;
+      return true;
+    case Tok::NotEq:
+      op = BinOp::Ne;
+      return true;
+    case Tok::Lt:
+      op = BinOp::Lt;
+      return true;
+    case Tok::Le:
+      op = BinOp::Le;
+      return true;
+    case Tok::Gt:
+      op = BinOp::Gt;
+      return true;
+    case Tok::Ge:
+      op = BinOp::Ge;
+      return true;
+    default:
+      return false;
     }
   }
 
@@ -371,12 +414,24 @@ private:
 
 void print(std::ostream& os, const Expr& e) {
   switch (e.kind) {
-  case Expr::Kind::IntLit: os << e.ival; break;
-  case Expr::Kind::FloatLit: os << e.fval; break;
-  case Expr::Kind::DurLit: os << e.ival << "ns"; break;
-  case Expr::Kind::StrLit: os << '"' << e.name << '"'; break;
-  case Expr::Kind::BoolLit: os << (e.bval ? "true" : "false"); break;
-  case Expr::Kind::Column: os << e.name; break;
+  case Expr::Kind::IntLit:
+    os << e.ival;
+    break;
+  case Expr::Kind::FloatLit:
+    os << e.fval;
+    break;
+  case Expr::Kind::DurLit:
+    os << e.ival << "ns";
+    break;
+  case Expr::Kind::StrLit:
+    os << '"' << e.name << '"';
+    break;
+  case Expr::Kind::BoolLit:
+    os << (e.bval ? "true" : "false");
+    break;
+  case Expr::Kind::Column:
+    os << e.name;
+    break;
   case Expr::Kind::Unary:
     os << '(' << (e.uop == UnOp::Neg ? "-" : "not ");
     print(os, *e.args[0]);
@@ -414,7 +469,9 @@ std::string to_string(const Query& q) {
   for (const auto& s : q.stages) {
     os << " | ";
     switch (s.kind) {
-    case Stage::Kind::Filter: os << "filter " << to_string(*s.pred); break;
+    case Stage::Kind::Filter:
+      os << "filter " << to_string(*s.pred);
+      break;
     case Stage::Kind::Select:
     case Stage::Kind::Derive:
       os << (s.kind == Stage::Kind::Select ? "select " : "derive ");
@@ -432,12 +489,16 @@ std::string to_string(const Query& q) {
         if (!s.aggs[i].alias.empty()) os << " as " << s.aggs[i].alias;
       }
       break;
-    case Stage::Kind::AsofJoin: os << "asof_join " << s.table << " on " << s.key; break;
+    case Stage::Kind::AsofJoin:
+      os << "asof_join " << s.table << " on " << s.key;
+      break;
     }
   }
   return os.str();
 }
 
-Query parse(std::string_view src) { return Parser(src).query(); }
+Query parse(std::string_view src) {
+  return Parser(src).query();
+}
 
 } // namespace tsq

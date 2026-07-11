@@ -26,7 +26,7 @@ struct CompileOptions {
   int opt_level = 2;                 // 0 = no IR optimization passes, 2 = default -O2 pipeline
   bool keep_ir = true;               // keep IR text (before/after optimization) for inspection
   bool window_direct_input = true;   // see CodegenOptions
-  bool window_output_history = true;  // see CodegenOptions
+  bool window_output_history = true; // see CodegenOptions
 };
 
 // A table supplied by name: column name -> view.
@@ -52,8 +52,8 @@ public:
 class CompiledQuery {
 public:
   // Throws CompileError on syntax/type errors.
-  static std::unique_ptr<CompiledQuery> compile(std::string text, const Catalog& cat, Backend backend,
-                                                const CompileOptions& opts = {});
+  static std::unique_ptr<CompiledQuery> compile(std::string text, const Catalog& cat,
+                                                Backend backend, const CompileOptions& opts = {});
 
   const BoundQuery& plan() const { return plan_; }
   const std::string& text() const { return text_; }
@@ -69,8 +69,11 @@ public:
                           bool validate = true) const;
 
   Result run(const BoundInputs& in) { return exec_->run(in); }
-  int64_t run_raw(const BoundInputs& in, void* const* outputs) { return exec_->run_raw(in, outputs); }
-  Result run(const NamedTables& tables, const std::vector<std::string>& symbols, bool validate = true) {
+  int64_t run_raw(const BoundInputs& in, void* const* outputs) {
+    return exec_->run_raw(in, outputs);
+  }
+  Result run(const NamedTables& tables, const std::vector<std::string>& symbols,
+             bool validate = true) {
     return run(bind_inputs(tables, symbols, validate));
   }
 

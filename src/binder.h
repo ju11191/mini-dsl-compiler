@@ -15,15 +15,15 @@ using BExprPtr = std::unique_ptr<BExpr>;
 
 struct BExpr {
   enum class Kind {
-    Col,      // column `col` of the stage's input schema
-    ConstI64, // i
-    ConstF64, // f
-    ConstBool,// b
-    SymParam, // code of sym literal #param, supplied at run time via QueryCtx::params
-    CastF64,  // i64 -> f64
+    Col,       // column `col` of the stage's input schema
+    ConstI64,  // i
+    ConstF64,  // f
+    ConstBool, // b
+    SymParam,  // code of sym literal #param, supplied at run time via QueryCtx::params
+    CastF64,   // i64 -> f64
     Neg,
     Not,
-    Bin,      // op, kids[0], kids[1]; operands already have identical types
+    Bin, // op, kids[0], kids[1]; operands already have identical types
     Abs,
     Sqrt,
   };
@@ -47,8 +47,8 @@ struct BAgg {
 };
 
 struct BPayload {
-  int right_col;  // column index in the right table
-  Type in_type;   // i64 or f64; output is always f64 (NaN when unmatched)
+  int right_col; // column index in the right table
+  Type in_type;  // i64 or f64; output is always f64 (NaN when unmatched)
   std::string name;
 };
 
@@ -63,7 +63,7 @@ struct BStage {
   int right_table = -1;        // Asof: index into BoundQuery::tables
   int left_key = -1, right_key = -1, right_ts = -1;
   std::vector<BPayload> payload; // Asof: appended after the input columns
-  Schema out;                  // schema after this stage
+  Schema out;                    // schema after this stage
 };
 
 struct BTable {

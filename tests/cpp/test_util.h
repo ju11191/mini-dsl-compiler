@@ -9,8 +9,10 @@ namespace tsq::test {
 
 inline Catalog trades_quotes_catalog() {
   Catalog c;
-  c.tables["trades"] = {{"ts", Type::I64}, {"sym", Type::Sym}, {"price", Type::F64}, {"size", Type::I64}};
-  c.tables["quotes"] = {{"ts", Type::I64}, {"sym", Type::Sym}, {"bid", Type::F64}, {"ask", Type::F64}};
+  c.tables["trades"] = {
+      {"ts", Type::I64}, {"sym", Type::Sym}, {"price", Type::F64}, {"size", Type::I64}};
+  c.tables["quotes"] = {
+      {"ts", Type::I64}, {"sym", Type::Sym}, {"bid", Type::F64}, {"ask", Type::F64}};
   return c;
 }
 
@@ -27,11 +29,13 @@ inline BoundQuery bind_text(std::string_view text, const Catalog& c = trades_quo
 
 namespace tsq::test {
 
-inline std::vector<std::string> syms() { return {"AAPL", "MSFT", "GOOG"}; }
+inline std::vector<std::string> syms() {
+  return {"AAPL", "MSFT", "GOOG"};
+}
 
 // Small hand-written tables. ts in ns.
-inline OwnedTable make_trades(std::vector<int64_t> ts, std::vector<int32_t> sym, std::vector<double> price,
-                              std::vector<int64_t> size) {
+inline OwnedTable make_trades(std::vector<int64_t> ts, std::vector<int32_t> sym,
+                              std::vector<double> price, std::vector<int64_t> size) {
   OwnedTable t({{"ts", Type::I64}, {"sym", Type::Sym}, {"price", Type::F64}, {"size", Type::I64}},
                int64_t(ts.size()));
   for (size_t i = 0; i < ts.size(); ++i) {
@@ -43,8 +47,8 @@ inline OwnedTable make_trades(std::vector<int64_t> ts, std::vector<int32_t> sym,
   return t;
 }
 
-inline OwnedTable make_quotes(std::vector<int64_t> ts, std::vector<int32_t> sym, std::vector<double> bid,
-                              std::vector<double> ask) {
+inline OwnedTable make_quotes(std::vector<int64_t> ts, std::vector<int32_t> sym,
+                              std::vector<double> bid, std::vector<double> ask) {
   OwnedTable t({{"ts", Type::I64}, {"sym", Type::Sym}, {"bid", Type::F64}, {"ask", Type::F64}},
                int64_t(ts.size()));
   for (size_t i = 0; i < ts.size(); ++i) {
@@ -69,8 +73,10 @@ inline Result run_query(std::string_view text, Backend b, const NamedTables& tab
 
 // Bitwise-equal comparison of two results (NaN == NaN).
 inline ::testing::AssertionResult results_identical(const Result& a, const Result& b) {
-  if (a.rows != b.rows) return ::testing::AssertionFailure() << "rows " << a.rows << " vs " << b.rows;
-  if (a.cols.size() != b.cols.size()) return ::testing::AssertionFailure() << "column count differs";
+  if (a.rows != b.rows)
+    return ::testing::AssertionFailure() << "rows " << a.rows << " vs " << b.rows;
+  if (a.cols.size() != b.cols.size())
+    return ::testing::AssertionFailure() << "column count differs";
   for (size_t c = 0; c < a.cols.size(); ++c) {
     if (a.cols[c].name != b.cols[c].name || a.cols[c].type != b.cols[c].type)
       return ::testing::AssertionFailure() << "column " << c << " name/type differs";
@@ -84,7 +90,8 @@ inline ::testing::AssertionResult results_identical(const Result& a, const Resul
           std::memcpy(&x, pa, 8);
           std::memcpy(&y, pb, 8);
           if (std::isnan(x) && std::isnan(y)) continue;
-          return ::testing::AssertionFailure() << a.cols[c].name << "[" << i << "]: " << x << " vs " << y;
+          return ::testing::AssertionFailure()
+                 << a.cols[c].name << "[" << i << "]: " << x << " vs " << y;
         }
         return ::testing::AssertionFailure() << a.cols[c].name << "[" << i << "] differs";
       }

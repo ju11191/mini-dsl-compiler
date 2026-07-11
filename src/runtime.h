@@ -9,11 +9,11 @@ namespace tsq {
 // Passed to the generated function `int64_t tsq_query(QueryCtx*)`.
 // Field order is mirrored by the LLVM struct type in codegen.cpp.
 struct QueryCtx {
-  const void* const* inputs;  // every column of every BoundQuery table, flattened in order
-  const int64_t* input_lens;  // rows per BoundQuery table
-  void* const* outputs;       // one buffer per output column (capacity = source rows)
-  void* const* scratch;       // buffers described by ScratchSpec
-  const int64_t* params;      // sym literal codes, then nsym
+  const void* const* inputs; // every column of every BoundQuery table, flattened in order
+  const int64_t* input_lens; // rows per BoundQuery table
+  void* const* outputs;      // one buffer per output column (capacity = source rows)
+  void* const* scratch;      // buffers described by ScratchSpec
+  const int64_t* params;     // sym literal codes, then nsym
 };
 
 using QueryFn = int64_t (*)(QueryCtx*);

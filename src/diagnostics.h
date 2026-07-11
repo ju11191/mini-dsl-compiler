@@ -19,7 +19,8 @@ struct SourceLoc {
 // render() produces a multi-line message with the offending source underlined.
 class CompileError : public std::runtime_error {
 public:
-  CompileError(std::string msg, SourceLoc loc) : std::runtime_error(msg), msg_(std::move(msg)), loc_(loc) {}
+  CompileError(std::string msg, SourceLoc loc)
+      : std::runtime_error(msg), msg_(std::move(msg)), loc_(loc) {}
   const SourceLoc& loc() const { return loc_; }
   const std::string& message() const { return msg_; }
   std::string render(std::string_view source) const;

@@ -4,20 +4,28 @@ namespace tsq {
 
 const char* type_name(Type t) {
   switch (t) {
-  case Type::I64: return "i64";
-  case Type::F64: return "f64";
-  case Type::Sym: return "sym";
-  case Type::Bool: return "bool";
+  case Type::I64:
+    return "i64";
+  case Type::F64:
+    return "f64";
+  case Type::Sym:
+    return "sym";
+  case Type::Bool:
+    return "bool";
   }
   return "?";
 }
 
 size_t type_size(Type t) {
   switch (t) {
-  case Type::I64: return 8;
-  case Type::F64: return 8;
-  case Type::Sym: return 4;
-  case Type::Bool: return 0;
+  case Type::I64:
+    return 8;
+  case Type::F64:
+    return 8;
+  case Type::Sym:
+    return 4;
+  case Type::Bool:
+    return 0;
   }
   return 0;
 }
