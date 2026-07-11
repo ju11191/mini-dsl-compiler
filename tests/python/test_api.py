@@ -140,3 +140,15 @@ def test_datagen_shapes():
     # deterministic
     d2 = tsq.datagen.make_dataset(10_000, 5_000, seed=3)
     np.testing.assert_array_equal(d2.tables["trades"]["price"], tr["price"])
+
+
+def test_concurrent_runs_of_one_query(small_data):
+    from concurrent.futures import ThreadPoolExecutor
+
+    q = tsq.compile("trades | window 50ms max(price), sum(size) | asof_join quotes on sym")
+    expected = q.run(small_data.tables, small_data.symbols)
+    with ThreadPoolExecutor(4) as ex:
+        outs = list(ex.map(lambda _: q.run(small_data.tables, small_data.symbols), range(16)))
+    for out in outs:
+        for k in expected:
+            np.testing.assert_array_equal(out[k], expected[k])

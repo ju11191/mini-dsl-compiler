@@ -6,6 +6,8 @@
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
 
+#include <mutex>
+
 namespace py = pybind11;
 using namespace tsq;
 
@@ -81,6 +83,9 @@ public:
     Result r;
     {
       py::gil_scoped_release release;
+      // Executables reuse scratch buffers, so concurrent runs of one query
+      // (possible once the GIL is released) are serialized.
+      std::lock_guard<std::mutex> lock(*mu_);
       r = q_->run(bi);
     }
     py::dict out;
@@ -129,6 +134,7 @@ public:
 
 private:
   std::unique_ptr<CompiledQuery> q_;
+  std::unique_ptr<std::mutex> mu_ = std::make_unique<std::mutex>();
 };
 
 } // namespace
