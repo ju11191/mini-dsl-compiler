@@ -1,0 +1,17 @@
+# date: 2026-10-19T06:52:17Z
+# host: Apple M3, 8 cpus, 16 GB
+# os: Darwin 24.6.0; llvm: 23.1.2
+# load averages before run: 8.40 6.15 6.90
+# command: build-bench/bench_queries --rows 50000000 --reps 7 --no-interp --only asof,combined,combined/&
+# tsq benchmark: rows=50000000 reps=7 window_direct_input=1 window_output_history=1 mode=native-only
+# generated trades+quotes in 634 ms
+# times in ms; med = median, min = minimum over reps; ratios use medians (and mins)
+query             out_rows     interp   jit_med   jit_min  hand_med  hand_min  jit_cold  int/jit jit/hand    (min)  c_parse  c_irgen    c_opt     c_mc  c_total  match
+asof              50000000        0.0    1816.4    1497.9    1854.4    1594.1     749.8     0.00    0.980    0.940    0.004    0.036     1.47     3.26     4.92    yes
+#raw asof jit_ms=1497.95,1648.6,1676.84,1833.08,1900.43,1926.97,1816.4, hand_ms=1639.59,1594.15,2269.89,1854.41,1889.85,1846.34,2212.24, jit_cold_ms=749.767 interp_ms= compile_total_ms=9.20525,4.91779,4.97725,4.60283,4.36175,
+combined           3161066        0.0     221.0     159.9     354.3     213.9     342.8     0.00    0.624    0.747    0.022    0.239     8.40     6.60    15.78    yes
+#raw combined jit_ms=220.968,224.835,184.546,215.227,248.651,231.369,159.907, hand_ms=437.31,417.054,213.932,238.627,402.405,354.34,298.761, jit_cold_ms=342.793 interp_ms= compile_total_ms=15.784,7.208,22.4099,36.2066,14.3902,
+combined/&         3161066        0.0     127.6     117.9     205.9     155.9     266.5     0.00    0.620    0.756    0.033    0.277     9.63    17.10    28.47    yes
+#raw combined/& jit_ms=355.269,118.976,171.214,122.658,117.886,127.605,149.584, hand_ms=155.905,331.635,205.909,195.556,279.571,184.435,299.869, jit_cold_ms=266.539 interp_ms= compile_total_ms=27.4522,28.4689,26.5009,29.1941,36.7924,
+# peak RSS 4784 MB; all outputs match: yes
+# load averages after run: 9.47 6.69 7.06

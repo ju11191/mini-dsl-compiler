@@ -1,0 +1,21 @@
+# date: 2026-10-19T06:51:30Z
+# host: Apple M3, 8 cpus, 16 GB
+# os: Darwin 24.6.0; llvm: 23.1.2
+# load averages before run: 4.07 5.17 6.61
+# command: build-bench/bench_queries --rows 50000000 --reps 7 --no-interp --only filter,filter/&,filter_wide,filter_project,window
+# tsq benchmark: rows=50000000 reps=7 window_direct_input=1 window_output_history=1 mode=native-only
+# generated trades+quotes in 312 ms
+# times in ms; med = median, min = minimum over reps; ratios use medians (and mins)
+query             out_rows     interp   jit_med   jit_min  hand_med  hand_min  jit_cold  int/jit jit/hand    (min)  c_parse  c_irgen    c_opt     c_mc  c_total  match
+filter             3161066        0.0      42.4      42.3     103.8     103.5      94.6     0.00    0.409    0.408    0.006    0.028     0.91     2.65     3.72    yes
+#raw filter jit_ms=44.3105,42.4047,42.2782,49.5698,42.372,42.3947,42.5815, hand_ms=103.809,103.604,116.016,133.704,103.539,103.792,103.735, jit_cold_ms=94.5719 interp_ms= compile_total_ms=54.7922,4.18604,3.72438,3.52242,3.437,
+filter/&           3161066        0.0      42.4      42.3      47.3      47.2      48.0     0.00    0.896    0.897    0.005    0.025     0.91     2.61     3.67    yes
+#raw filter/& jit_ms=42.5199,43.4842,42.3118,42.6368,42.3956,42.3683,42.3709, hand_ms=47.3106,48.364,47.2968,47.2802,47.1861,47.4295,47.2014, jit_cold_ms=47.9672 interp_ms= compile_total_ms=5.00783,3.87113,3.67029,3.45121,3.45604,
+filter_wide       40660508        0.0      87.3      86.8      96.3      96.0     148.7     0.00    0.907    0.904    0.006    0.023     0.89     1.51     2.60    yes
+#raw filter_wide jit_ms=87.0745,127.107,90.8344,92.3007,86.8011,86.8103,87.2844, hand_ms=96.2558,95.9936,100.536,138.503,96.8865,96.086,96.2377, jit_cold_ms=148.653 interp_ms= compile_total_ms=3.88262,2.60338,2.62637,2.35196,2.27375,
+filter_project    20289968        0.0     221.7     219.9     224.3     221.5     258.3     0.00    0.988    0.993    0.007    0.024     0.79     1.47     2.50    yes
+#raw filter_project jit_ms=222.611,221.686,221.403,220.381,219.875,222.336,222.332, hand_ms=225.232,224.3,224.554,221.535,222.986,226.222,224.338, jit_cold_ms=258.283 interp_ms= compile_total_ms=5.09292,2.52558,2.35058,2.40238,2.50362,
+window            50000000        0.0    2295.8    1333.3    2005.0    1478.1    1310.7     0.00    1.145    0.902    0.005    0.052     2.39     3.88     6.43    yes
+#raw window jit_ms=2066.5,2295.81,2304.09,2641.23,2420.77,1962.25,1333.28, hand_ms=2005.04,1996.68,2498.04,2800.86,2196.59,1578.56,1478.05, jit_cold_ms=1310.69 interp_ms= compile_total_ms=16.5188,6.41442,6.41358,6.42762,6.47283,
+# peak RSS 4230 MB; all outputs match: yes
+# load averages after run: 8.40 6.15 6.90
